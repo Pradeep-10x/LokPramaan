@@ -1,253 +1,224 @@
 generator client {
-    provider = "prisma-client"
-    output   = "../src/generated/prisma"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
-    provider = "postgresql"
-}
-
-// ─── Enums ────────────────────────────────────────────────
-
-enum Role {
-    CITIZEN
-    OFFICER
-    INSPECTOR
-    ADMIN
-    CONTRACTOR
-}
-
-enum Department {
-    MUNICIPAL
-    ELECTRICITY
-    WATER
-    SANITATION
-    HEALTH
-    TRANSPORT
-}
-
-enum AdminUnitType {
-    GLOBAL
-    CITY
-    WARD
-}
-
-enum ProjectStatus {
-    PROPOSED
-    ACTIVE
-    COMPLETED
-    CANCELLED
-}
-
-enum IssueStatus {
-    OPEN
-    ASSIGNED
-    IN_PROGRESS
-    COMPLETED
-    VERIFIED
-}
-
-enum EvidenceType {
-    BEFORE
-    AFTER
-}
-
-enum VerificationVerdict {
-    APPROVED
-    REJECTED
-}
-
-enum NotificationChannel {
-    SMS
-    WHATSAPP
-    SYSTEM
+  provider = "postgresql"
 }
 
 model AdminUnit {
-    id       String        @id @default(uuid())
-    name     String
-    type     AdminUnitType
-    parentId String?
+  id       String        @id @default(uuid())
+  name     String
+  type     AdminUnitType
+  parentId String?
+  parent   AdminUnit?    @relation("AdminUnitTree", fields: [parentId], references: [id])
+  children AdminUnit[]   @relation("AdminUnitTree")
+  issues   Issue[]
+  projects Project[]
+  users    User[]
 
-    parent   AdminUnit?  @relation("AdminUnitTree", fields: [parentId], references: [id])
-    children AdminUnit[] @relation("AdminUnitTree")
-
-    users    User[]
-    projects Project[]
-    issues   Issue[]
-
-    @@unique([name, parentId])
-    @@index([parentId])
-    @@index([type])
+  @@unique([name, parentId])
+  @@index([parentId])
+  @@index([type])
 }
 
 model User {
-    id           String  @id @default(uuid())
-    name         String
-    email        String? @unique
-    passwordHash String
-    role         Role    @default(CITIZEN)
-    adminUnitId  String?
+  id               String         @id @default(uuid())
+  name             String
+  email            String?        @unique
+  passwordHash     String
+  role             Role           @default(CITIZEN)
+  adminUnitId      String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  auditActions     AuditLog[]     @relation("AuditActor")
+  uploadedEvidence Evidence[]
+  assignedIssues   Issue[]        @relation("IssueAssignee")
+  createdIssues    Issue[]        @relation("IssueCreator")
+  createdProjects  Project[]      @relation("ProjectCreator")
+  adminUnit        AdminUnit?     @relation(fields: [adminUnitId], references: [id])
+  verifications    Verification[]
 
-    adminUnit AdminUnit? @relation(fields: [adminUnitId], references: [id])
-
-    createdProjects  Project[]      @relation("ProjectCreator")
-    createdIssues    Issue[]        @relation("IssueCreator")
-    assignedIssues   Issue[]        @relation("IssueAssignee")
-    uploadedEvidence Evidence[]
-    verifications    Verification[]
-    auditActions     AuditLog[]     @relation("AuditActor")
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    @@index([role])
-    @@index([adminUnitId])
+  @@index([role])
+  @@index([adminUnitId])
 }
 
 model Project {
-    id          String        @id @default(uuid())
-    title       String
-    description String
-    status      ProjectStatus @default(PROPOSED)
-    adminUnitId String
-    createdById String
-    budget      Decimal?
+  id          String        @id @default(uuid())
+  title       String
+  description String
+  status      ProjectStatus @default(PROPOSED)
+  adminUnitId String
+  createdById String
+  budget      Decimal?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  auditLogs   AuditLog[]
+  issues      Issue[]
+  adminUnit   AdminUnit     @relation(fields: [adminUnitId], references: [id])
+  createdBy   User          @relation("ProjectCreator", fields: [createdById], references: [id])
 
-    adminUnit AdminUnit  @relation(fields: [adminUnitId], references: [id])
-    createdBy User       @relation("ProjectCreator", fields: [createdById], references: [id])
-    issues    Issue[]
-    auditLogs AuditLog[]
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    @@index([adminUnitId])
-    @@index([status])
+  @@index([adminUnitId])
+  @@index([status])
 }
 
 model Issue {
-    id            String      @id @default(uuid())
-    title         String
-    description   String?
-    status        IssueStatus @default(OPEN)
-    wardId        String
-    department    Department
-    projectId     String?
-    createdById   String
-    assignedToId  String?
-    slaDeadline   DateTime?
-    latitude      Float
-    longitude     Float
-    duplicateOfId String?
+  id               String            @id @default(uuid())
+  title            String
+  description      String?
+  status           IssueStatus       @default(OPEN)
+  wardId           String
+  department       Department
+  projectId        String?
+  createdById      String
+  assignedToId     String?
+  slaDeadline      DateTime?
+  latitude         Float
+  longitude        Float
+  duplicateOfId    String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  auditLogs        AuditLog[]
+  evidence         Evidence[]
+  assignedTo       User?             @relation("IssueAssignee", fields: [assignedToId], references: [id])
+  createdBy        User              @relation("IssueCreator", fields: [createdById], references: [id])
+  duplicateOf      Issue?            @relation("IssueDuplicate", fields: [duplicateOfId], references: [id])
+  duplicates       Issue[]           @relation("IssueDuplicate")
+  project          Project?          @relation(fields: [projectId], references: [id])
+  ward             AdminUnit         @relation(fields: [wardId], references: [id])
+  notificationLogs NotificationLog[]
+  verification     Verification?
 
-    ward       AdminUnit @relation(fields: [wardId], references: [id])
-    project    Project?  @relation(fields: [projectId], references: [id])
-    createdBy  User      @relation("IssueCreator", fields: [createdById], references: [id])
-    assignedTo User?     @relation("IssueAssignee", fields: [assignedToId], references: [id])
-
-    duplicateOf Issue?  @relation("IssueDuplicate", fields: [duplicateOfId], references: [id])
-    duplicates  Issue[] @relation("IssueDuplicate")
-
-    evidence         Evidence[]
-    verification     Verification?
-    auditLogs        AuditLog[]
-    notificationLogs NotificationLog[]
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-    // NOTE: For PostGIS, add a geometry column via raw migration:
-    // ALTER TABLE "Issue" ADD COLUMN geom geometry(Point, 4326);
-    // CREATE INDEX idx_issue_geom ON "Issue" USING GIST (geom);
-    // Then populate: UPDATE "Issue" SET geom = ST_SetSRID(ST_MakePoint(longitude, latitude), 4326);
-
-    @@index([wardId])
-    @@index([status])
-    @@index([assignedToId])
-    @@index([projectId])
+  @@index([wardId])
+  @@index([status])
+  @@index([assignedToId])
+  @@index([projectId])
 }
 
 model Evidence {
-    id           String       @id @default(uuid())
-    issueId      String
-    type         EvidenceType
-    fileUrl      String
-    fileHash     String
-    latitude     Float?
-    longitude    Float?
-    exifTime     DateTime?
-    geoFallback  Boolean      @default(false)
-    uploadedById String
+  id           String       @id @default(uuid())
+  issueId      String
+  type         EvidenceType
+  fileUrl      String
+  fileHash     String
+  latitude     Float?
+  longitude    Float?
+  exifTime     DateTime?
+  geoFallback  Boolean      @default(false)
+  uploadedById String
+  uploadedAt   DateTime     @default(now())
+  issue        Issue        @relation(fields: [issueId], references: [id])
+  uploadedBy   User         @relation(fields: [uploadedById], references: [id])
 
-    issue      Issue @relation(fields: [issueId], references: [id])
-    uploadedBy User  @relation(fields: [uploadedById], references: [id])
-
-    uploadedAt DateTime @default(now())
-
-    @@index([issueId])
-    @@index([type])
+  @@index([issueId])
+  @@index([type])
 }
 
 model Verification {
-    id           String              @id @default(uuid())
-    issueId      String              @unique
-    verifiedById String
-    verdict      VerificationVerdict
-    remarks      String?
-    overrideNote String?
-
-    issue      Issue @relation(fields: [issueId], references: [id])
-    verifiedBy User  @relation(fields: [verifiedById], references: [id])
-
-    verifiedAt DateTime @default(now())
+  id           String              @id @default(uuid())
+  issueId      String              @unique
+  verifiedById String
+  verdict      VerificationVerdict
+  remarks      String?
+  overrideNote String?
+  verifiedAt   DateTime            @default(now())
+  issue        Issue               @relation(fields: [issueId], references: [id])
+  verifiedBy   User                @relation(fields: [verifiedById], references: [id])
 }
 
 model AuditLog {
-    id        String  @id @default(uuid())
-    issueId   String?
-    projectId String?
-    actorId   String
-    action    String
-    metadata  Json?
+  id        String   @id @default(uuid())
+  issueId   String?
+  projectId String?
+  actorId   String
+  action    String
+  metadata  Json?
+  createdAt DateTime @default(now())
+  actor     User     @relation("AuditActor", fields: [actorId], references: [id])
+  issue     Issue?   @relation(fields: [issueId], references: [id])
+  project   Project? @relation(fields: [projectId], references: [id])
 
-    issue   Issue?   @relation(fields: [issueId], references: [id])
-    project Project? @relation(fields: [projectId], references: [id])
-    actor   User     @relation("AuditActor", fields: [actorId], references: [id])
-
-    createdAt DateTime @default(now())
-
-    @@index([issueId])
-    @@index([projectId])
-    @@index([actorId])
+  @@index([issueId])
+  @@index([projectId])
+  @@index([actorId])
 }
 
 model Resident {
-    id        String  @id @default(uuid())
-    name      String?
-    phoneHash String
-    latitude  Float
-    longitude Float
+  id        String   @id @default(uuid())
+  name      String?
+  phoneHash String
+  latitude  Float
+  longitude Float
+  createdAt DateTime @default(now())
 
-    createdAt DateTime @default(now())
-    // NOTE: For PostGIS radius queries, add:
-    // ALTER TABLE "Resident" ADD COLUMN geom geometry(Point, 4326);
-    // CREATE INDEX idx_resident_geom ON "Resident" USING GIST (geom);
-
-    @@index([phoneHash])
+  @@index([phoneHash])
 }
 
 /// Log of notifications sent to residents about nearby issues
 model NotificationLog {
-    id            String              @id @default(uuid())
-    issueId       String
-    recipientHash String
-    message       String
-    channel       NotificationChannel
-    status        String?
+  id            String              @id @default(uuid())
+  issueId       String
+  recipientHash String
+  message       String
+  channel       NotificationChannel
+  status        String?
+  sentAt        DateTime            @default(now())
+  issue         Issue               @relation(fields: [issueId], references: [id])
 
-    issue Issue @relation(fields: [issueId], references: [id])
+  @@index([issueId])
+}
 
-    sentAt DateTime @default(now())
+enum Role {
+  CITIZEN
+  OFFICER
+  INSPECTOR
+  ADMIN
+  CONTRACTOR
+}
 
-    @@index([issueId])
+enum Department {
+  MUNICIPAL
+  ELECTRICITY
+  WATER
+  SANITATION
+  HEALTH
+  TRANSPORT
+}
+
+enum AdminUnitType {
+  GLOBAL
+  CITY
+  WARD
+}
+
+enum ProjectStatus {
+  PROPOSED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum IssueStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  VERIFIED
+}
+
+enum EvidenceType {
+  BEFORE
+  AFTER
+}
+
+enum VerificationVerdict {
+  APPROVED
+  REJECTED
+}
+
+enum NotificationChannel {
+  SMS
+  WHATSAPP
+  SYSTEM
 }
