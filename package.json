@@ -6,8 +6,8 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "start": "node dist/server.js",
-    "build": "npx prisma generate && tsc",
+    "start": "tsx src/server.ts",
+    "build": "npx prisma generate",
     "seed": "tsx src/seed/seed.ts",
     "test": "jest --forceExit --detectOpenHandles",
     "test:unit": "jest --testPathPatterns=unit --forceExit",
