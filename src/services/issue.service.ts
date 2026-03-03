@@ -11,6 +11,7 @@ import { config } from '../config';
 export interface CreateIssueInput {
   title: string;
   description?: string;
+  department: string;
   latitude: number;
   longitude: number;
   wardId: string;
@@ -52,6 +53,7 @@ export async function createIssue(input: CreateIssueInput) {
     data: {
       title: input.title,
       description: input.description,
+      department: input.department as any,
       latitude: input.latitude,
       longitude: input.longitude,
       wardId: input.wardId,
@@ -199,7 +201,7 @@ export async function convertIssueToProject(
     prisma.project.create({
       data: {
         title: input.title,
-        description: input.description,
+        description: input.description ?? '',
         budget: input.budget,
         status: ProjectStatus.PROPOSED,
         adminUnitId: issue.wardId,
@@ -215,8 +217,7 @@ export async function convertIssueToProject(
       where: { id: issueId },
       data: {
         projectId: project.id,
-        status: IssueStatus.ESCALATED,
-        escalationReason: `Converted to project: ${input.title}`,
+        status: IssueStatus.IN_PROGRESS,
       },
     }),
     prisma.auditLog.create({

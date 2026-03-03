@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: lokpramaan-api
+    runtime: node
+    region: singapore  
+    plan: free
+    buildCommand: npm install && npm run build && npx prisma migrate deploy
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: lokpramaan-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: RESIDENT_PHONE_SALT
+        generateValue: true
+      - key: PORT
+        value: "10000"
+      - key: UPLOAD_DIR
+        value: ./uploads
+
+databases:
+  - name: lokpramaan-db
+    plan: free
+    region: singapore
+    databaseName: lokpramaan

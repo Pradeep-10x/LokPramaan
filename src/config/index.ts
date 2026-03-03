@@ -3,6 +3,7 @@
  * All environment variables are read and validated here.
  */
 import dotenv from 'dotenv';
+import fs from 'fs';
 dotenv.config();
 
 export const config = {
@@ -24,3 +25,6 @@ export const config = {
     from: process.env.TWILIO_FROM,
   },
 } as const;
+
+// Ensure upload directory exists (Render has ephemeral filesystem)
+fs.mkdirSync(config.uploadDir, { recursive: true });

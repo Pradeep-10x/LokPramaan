@@ -26,7 +26,7 @@ export async function createProject(input: CreateProjectInput) {
   const project = await prisma.project.create({
     data: {
       title: input.title,
-      description: input.description,
+      description: input.description ?? '',
       adminUnitId: input.adminUnitId,
       createdById: input.createdById,
       budget: input.budget,
