@@ -5,14 +5,16 @@
  */
 import { PrismaClient } from '../generated/prisma/client.js';
 import { PrismaPg } from '@prisma/adapter-pg';
+import pg from 'pg';
 
 const connectionString = process.env.DATABASE_URL!;
-const adapter = new PrismaPg({
+
+const pool = new pg.Pool({
   connectionString,
-  options: {
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
-  },
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
 });
+
+const adapter = new PrismaPg({ pool });
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
 
