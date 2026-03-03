@@ -9,12 +9,14 @@ import pg from 'pg';
 
 const connectionString = process.env.DATABASE_URL!;
 
+// Supabase always requires SSL
 const pool = new pg.Pool({
   connectionString,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
+  ssl: { rejectUnauthorized: false },
 });
 
-const adapter = new PrismaPg({ pool });
+// PrismaPg takes pool directly as first arg, NOT { pool }
+const adapter = new PrismaPg(pool);
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
 
