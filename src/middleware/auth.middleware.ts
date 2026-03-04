@@ -48,7 +48,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
       return;
     }
 
-    req.user = { id: user.id, role: user.role, adminUnitId: user.adminUnitId };
+     req.user = { id: user.id, role: user.role, adminUnitId: user.adminUnitId };
     next();
   } catch {
     res.status(401).json({ code: 'UNAUTHORIZED', message: 'Invalid or expired token' });

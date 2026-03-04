@@ -8,7 +8,8 @@ import { requireRole } from '../middleware/rbac.middleware';
 
 const router = Router();
 
-router.post('/', authMiddleware, requireRole('ADMIN'), usersCtrl.createUser);
+router.post('/create-user', authMiddleware, requireRole('ADMIN'), usersCtrl.createUser);
+router.post('/contractor', authMiddleware, requireRole('ADMIN', 'OFFICER'), usersCtrl.createContractor);
 router.get('/me', authMiddleware, usersCtrl.getMe);
 
 export default router;
