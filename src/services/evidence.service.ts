@@ -27,6 +27,8 @@ export async function uploadEvidence(
   uploaderRole: string,
   type: EvidenceType,
   file: Express.Multer.File,
+  deviceLat?: number,
+  deviceLng?: number,
 ) {
   // Validate issue exists
   const issue = await prisma.issue.findUnique({
@@ -65,6 +67,21 @@ export async function uploadEvidence(
   // Extract EXIF data
   const exif = await extractExif(file.buffer);
 
+  // ── EXIF age validation (hard reject) ─────────────────────────────────────
+  // If the photo carries a timestamp, it must be recent. This prevents
+  // inspectors and citizens from submitting archived or stock photos.
+  if (exif.datetime) {
+    const maxAgeMs = config.photoMaxAgeHours * 60 * 60 * 1000;
+    const cutoff   = new Date(Date.now() - maxAgeMs);
+    if (exif.datetime < cutoff) {
+      throw new AppError(
+        400,
+        'PHOTO_TOO_OLD',
+        `Photo was taken at ${exif.datetime.toISOString()} which is more than ${config.photoMaxAgeHours}h ago. Please take a fresh photo on-site.`,
+      );
+    }
+  }
+
   // Determine coordinates: use EXIF if available, else flag as geoFallback
   let evidenceLat = exif.latitude;
   let evidenceLon = exif.longitude;
@@ -74,6 +91,28 @@ export async function uploadEvidence(
     geoFallback = true;
     evidenceLat = null;
     evidenceLon = null;
+  }
+
+  // ── Device GPS vs EXIF GPS check (hard reject) ─────────────────────────
+  // If the client sent its live device GPS AND the photo contains EXIF GPS,
+  // both coordinates must agree within the configured tolerance. A large
+  // discrepancy means the photo was taken elsewhere and passed off as on-site.
+  if (
+    deviceLat !== undefined && deviceLat !== null &&
+    deviceLng !== undefined && deviceLng !== null &&
+    evidenceLat !== null    && evidenceLon !== null
+  ) {
+    const deviceToPhotoDistance = haversineDistance(
+      deviceLat, deviceLng, evidenceLat, evidenceLon,
+    );
+    if (deviceToPhotoDistance > config.devicePhotoDistanceMetres) {
+      throw new AppError(
+        400,
+        'LOCATION_MISMATCH',
+        `Your device location and the photo’s GPS location are ${Math.round(deviceToPhotoDistance)}m apart ` +
+        `(limit: ${config.devicePhotoDistanceMetres}m). Please take the photo on-site with location enabled.`,
+      );
+    }
   }
 
   // Geo-proximity check against issue location

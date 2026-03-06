@@ -18,6 +18,21 @@ export const config = {
   /** Max geo-distance (metres) before evidence is flagged as geoFallback */
   geoThresholdMetres: parseInt(process.env.GEO_THRESHOLD_METRES || '50', 10),
 
+  /**
+   * Maximum age of photo EXIF timestamp (hours) — photos older than this
+   * are rejected to prevent re-use of archive/stock images.
+   * Default: 6 hours.
+   */
+  photoMaxAgeHours: parseInt(process.env.PHOTO_MAX_AGE_HOURS || '6', 10),
+
+  /**
+   * Maximum distance (metres) between device GPS and photo EXIF GPS.
+   * If they differ more than this the upload is rejected.
+   * Slightly more lenient than geoThresholdMetres to account for GPS drift.
+   * Default: 500 m.
+   */
+  devicePhotoDistanceMetres: parseInt(process.env.DEVICE_PHOTO_DISTANCE_METRES || '500', 10),
+
   /** Twilio (optional) */
   twilio: {
     sid: process.env.TWILIO_SID,

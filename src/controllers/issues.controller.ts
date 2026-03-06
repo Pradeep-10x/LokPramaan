@@ -7,6 +7,8 @@ import * as issueService from '../services/issue.service';
 import { prisma } from '../prisma/client';
 import { tryExtractPhotoLocation } from '../services/exif.service';
 import { getNearestWard } from '../services/adminUnit.service';
+import { haversineDistance } from '../utils/geo.util';
+import { config } from '../config/index.js';
 
 export const upload = multer({ storage: multer.memoryStorage() });
 
@@ -14,23 +16,28 @@ export async function create(req: Request, res: Response, next: NextFunction) {
   try {
     let latitude: number | undefined;
     let longitude: number | undefined;
+    let photoDeviceLocationWarning: string | null = null;
 
     // ── Step 1: Try photo EXIF first ──────────────────────────
+    let exifLocation: { lat: number; lng: number } | null = null;
     if (req.file) {
       const exif = await tryExtractPhotoLocation(req.file.buffer);
       if (exif) {
         // ✅ Photo has valid GPS + fresh timestamp
-        latitude  = exif.lat;
-        longitude = exif.lng;
+        latitude     = exif.lat;
+        longitude    = exif.lng;
+        exifLocation = { lat: exif.lat, lng: exif.lng };
       }
       // ❌ Photo has no GPS / too old → fall through to device GPS
     }
 
     // ── Step 2: Fall back to device GPS sent by frontend ─────
+    const deviceLat = parseFloat(req.body.deviceLat);
+    const deviceLng = parseFloat(req.body.deviceLng);
+    const hasDeviceGps = !isNaN(deviceLat) && !isNaN(deviceLng);
+
     if (latitude === undefined || longitude === undefined) {
-      const deviceLat = parseFloat(req.body.deviceLat);
-      const deviceLng = parseFloat(req.body.deviceLng);
-      if (!isNaN(deviceLat) && !isNaN(deviceLng)) {
+      if (hasDeviceGps) {
         latitude  = deviceLat;
         longitude = deviceLng;
       }
@@ -45,7 +52,21 @@ export async function create(req: Request, res: Response, next: NextFunction) {
       return;
     }
 
-    // ── Step 4: Always auto-detect ward — never trust body ────
+    // ── Step 4: Cross-check device GPS vs photo EXIF GPS ──────
+    // If the citizen’s device GPS and the photo EXIF GPS are available but
+    // far apart, the photo may have been taken at a different location.
+    // We warn (not reject) since for issue creation the citizen might have
+    // slightly moved between taking the photo and submitting.
+    if (exifLocation && hasDeviceGps) {
+      const dist = haversineDistance(exifLocation.lat, exifLocation.lng, deviceLat, deviceLng);
+      if (dist > config.devicePhotoDistanceMetres) {
+        photoDeviceLocationWarning =
+          `Photo GPS and device GPS are ${Math.round(dist)}m apart. ` +
+          `Using photo GPS. Verify you were on-site when the photo was taken.`;
+      }
+    }
+
+    // ── Step 5: Always auto-detect ward — never trust body ────
     const nearest = await getNearestWard(latitude, longitude);
 
     const result = await issueService.createIssue({
@@ -58,7 +79,7 @@ export async function create(req: Request, res: Response, next: NextFunction) {
       longitude,
       wardId: nearest.wardId,   // always auto-detected, never from body
     });
-    res.status(201).json(result);
+    res.status(201).json({ ...result, ...(photoDeviceLocationWarning ? { photoDeviceLocationWarning } : {}) });
   } catch (err) {
     next(err);
   }

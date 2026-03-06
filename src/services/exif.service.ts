@@ -4,8 +4,7 @@
  */
 import { extractExif } from '../utils/exif.util';
 import { AppError } from '../middleware/error.middleware';
-
-const MAX_PHOTO_AGE_DAYS = 2;
+import { config } from '../config/index.js';
 
 /**
  * Strict version — throws if GPS/timestamp missing or photo too old.
@@ -32,14 +31,14 @@ export async function extractAndValidatePhotoLocation(
     );
   }
 
-  const maxAgeMs = MAX_PHOTO_AGE_DAYS * 24 * 60 * 60 * 1000;
+  const maxAgeMs = config.photoMaxAgeHours * 60 * 60 * 1000;
   const cutoff = new Date(Date.now() - maxAgeMs);
 
   if (exif.datetime < cutoff) {
     throw new AppError(
       400,
       'PHOTO_TOO_OLD',
-      `Photo was taken on ${exif.datetime.toISOString().slice(0, 10)}. Only photos taken within the last ${MAX_PHOTO_AGE_DAYS} days are accepted.`,
+      `Photo was taken at ${exif.datetime.toISOString()}. Only photos taken within the last ${config.photoMaxAgeHours} hour(s) are accepted.`,
     );
   }
 
@@ -63,7 +62,7 @@ export async function tryExtractPhotoLocation(
     return null;
   }
 
-  const maxAgeMs = MAX_PHOTO_AGE_DAYS * 24 * 60 * 60 * 1000;
+  const maxAgeMs = config.photoMaxAgeHours * 60 * 60 * 1000;
   const cutoff = new Date(Date.now() - maxAgeMs);
 
   if (exif.datetime < cutoff) {

@@ -19,12 +19,19 @@ export async function upload(req: Request, res: Response, next: NextFunction) {
     }
 
     const id = req.params.id as string;
+
+    // Optional device GPS — used to cross-check against photo EXIF GPS
+    const deviceLat = req.body.deviceLat !== undefined ? parseFloat(req.body.deviceLat) : undefined;
+    const deviceLng = req.body.deviceLng !== undefined ? parseFloat(req.body.deviceLng) : undefined;
+
     const result = await evidenceService.uploadEvidence(
       id,
       req.user!.id,
       req.user!.role,
       type,
       req.file,
+      !isNaN(deviceLat as number) ? (deviceLat as number) : undefined,
+      !isNaN(deviceLng as number) ? (deviceLng as number) : undefined,
     );
 
     const status = result.geoWarning ? 200 : 201;
