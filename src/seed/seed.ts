@@ -1,8 +1,8 @@
 /*
  * Ghaziabad Municipal Corporation – WitnessLedger Demo Seed
  *
- * 10 real Ghaziabad wards (5 GMC zones) · 27 demo users · 12 civic issues
- * · 3 infrastructure projects · 30 residents with real area GPS
+ * 10 real Ghaziabad wards (5 GMC zones) · 1 city admin + 10 ward admins + 10 officers
+ * · 4 inspectors · 3 contractors · 6 citizens · 12 issues · 3 projects · 30 residents
  *
  * Run:  npm run seed          (ts-node src/seed/seed.ts)
  *       npx prisma db seed    (via package.json prisma.seed)
@@ -47,24 +47,39 @@ type WardName = keyof typeof WARD_GEO;
 // ─────────────────────────────────────────────────────────────────────────────
 // USER DEFINITIONS
 // ─────────────────────────────────────────────────────────────────────────────
-const ADMIN_CRED = {
+// ── City-level admin (manages Ghaziabad as a whole) ─────────────────────────
+const CITY_ADMIN_CRED = {
   name: 'Rajiv Sharma',
   email: 'admin@gmc.local',
   password: 'Admin@Ghz2025!',
-  role: Role.ADMIN as Role,
 };
 
+// ── One ADMIN per ward (ward-level authority) ─────────────────────────────────
+const WARD_ADMIN_CREDS: { name: string; email: string; password: string; ward: WardName }[] = [
+  { name: 'Anand Tripathi',    email: 'admin.rajnagar@gmc.local',    password: 'WAdmin@123!', ward: 'Raj Nagar'   },
+  { name: 'Seema Yadav',       email: 'admin.sahibabad@gmc.local',   password: 'WAdmin@123!', ward: 'Sahibabad'   },
+  { name: 'Vinod Mishra',      email: 'admin.kavinagar@gmc.local',   password: 'WAdmin@123!', ward: 'Kavi Nagar'  },
+  { name: 'Geeta Srivastava',  email: 'admin.nehrunagar@gmc.local',  password: 'WAdmin@123!', ward: 'Nehru Nagar' },
+  { name: 'Sudhir Pal',        email: 'admin.vijaynagar@gmc.local',  password: 'WAdmin@123!', ward: 'Vijay Nagar' },
+  { name: 'Rekha Tiwari',      email: 'admin.mohannagar@gmc.local',  password: 'WAdmin@123!', ward: 'Mohan Nagar' },
+  { name: 'Kapil Dev Sharma',  email: 'admin.vasundhara@gmc.local',  password: 'WAdmin@123!', ward: 'Vasundhara'  },
+  { name: 'Alka Gupta',        email: 'admin.indirapuram@gmc.local', password: 'WAdmin@123!', ward: 'Indirapuram' },
+  { name: 'Narendra Chauhan',  email: 'admin.vaishali@gmc.local',    password: 'WAdmin@123!', ward: 'Vaishali'    },
+  { name: 'Sanjay Agarwal',    email: 'admin.kaushambi@gmc.local',   password: 'WAdmin@123!', ward: 'Kaushambi'   },
+];
+
+// ── One OFFICER per ward (field-level execution) ─────────────────────────────
 const OFFICER_CREDS: { name: string; email: string; password: string; ward: WardName }[] = [
-  { name: 'Sunita Verma',       email: 'officer.rajnagar@gmc.local',    password: 'Officer@123!', ward: 'Raj Nagar' },
-  { name: 'Manish Kumar',       email: 'officer.sahibabad@gmc.local',   password: 'Officer@123!', ward: 'Sahibabad' },
-  { name: 'Pankaj Mishra',      email: 'officer.kavinagar@gmc.local',   password: 'Officer@123!', ward: 'Kavi Nagar' },
+  { name: 'Sunita Verma',       email: 'officer.rajnagar@gmc.local',    password: 'Officer@123!', ward: 'Raj Nagar'   },
+  { name: 'Manish Kumar',       email: 'officer.sahibabad@gmc.local',   password: 'Officer@123!', ward: 'Sahibabad'   },
+  { name: 'Pankaj Mishra',      email: 'officer.kavinagar@gmc.local',   password: 'Officer@123!', ward: 'Kavi Nagar'  },
   { name: 'Deepak Srivastava',  email: 'officer.nehrunagar@gmc.local',  password: 'Officer@123!', ward: 'Nehru Nagar' },
   { name: 'Neelam Yadav',       email: 'officer.vijaynagar@gmc.local',  password: 'Officer@123!', ward: 'Vijay Nagar' },
   { name: 'Ashok Tiwari',       email: 'officer.mohannagar@gmc.local',  password: 'Officer@123!', ward: 'Mohan Nagar' },
-  { name: 'Priya Singh',        email: 'officer.vasundhara@gmc.local',  password: 'Officer@123!', ward: 'Vasundhara' },
+  { name: 'Priya Singh',        email: 'officer.vasundhara@gmc.local',  password: 'Officer@123!', ward: 'Vasundhara'  },
   { name: 'Deepak Gupta',       email: 'officer.indirapuram@gmc.local', password: 'Officer@123!', ward: 'Indirapuram' },
-  { name: 'Kavita Rani',        email: 'officer.vaishali@gmc.local',    password: 'Officer@123!', ward: 'Vaishali' },
-  { name: 'Sunil Agarwal',      email: 'officer.kaushambi@gmc.local',   password: 'Officer@123!', ward: 'Kaushambi' },
+  { name: 'Kavita Rani',        email: 'officer.vaishali@gmc.local',    password: 'Officer@123!', ward: 'Vaishali'    },
+  { name: 'Sunil Agarwal',      email: 'officer.kaushambi@gmc.local',   password: 'Officer@123!', ward: 'Kaushambi'   },
 ];
 
 // Each inspector is homed to a ward but covers the full zone in practice
@@ -140,19 +155,33 @@ async function main() {
   // ── 2. Users ─────────────────────────────────────────────────────────────
   const uid: Record<string, string> = {};
 
-  // Admin
-  const admin = await prisma.user.create({
+  // City-level admin
+  const cityAdmin = await prisma.user.create({
     data: {
-      name: ADMIN_CRED.name,
-      email: ADMIN_CRED.email,
-      passwordHash: await hashPw(ADMIN_CRED.password),
-      role: ADMIN_CRED.role,
+      name: CITY_ADMIN_CRED.name,
+      email: CITY_ADMIN_CRED.email,
+      passwordHash: await hashPw(CITY_ADMIN_CRED.password),
+      role: Role.ADMIN,
       adminUnitId: ghaziabad.id,
     },
   });
-  uid[ADMIN_CRED.email] = admin.id;
+  uid[CITY_ADMIN_CRED.email] = cityAdmin.id;
 
-  // Officers (one per ward)
+  // Ward-level admins (one per ward)
+  for (const wa of WARD_ADMIN_CREDS) {
+    const u = await prisma.user.create({
+      data: {
+        name: wa.name,
+        email: wa.email,
+        passwordHash: await hashPw(wa.password),
+        role: Role.ADMIN,
+        adminUnitId: wardIds[wa.ward],
+      },
+    });
+    uid[wa.email] = u.id;
+  }
+
+  // Officers (one per ward – field execution layer)
   for (const o of OFFICER_CREDS) {
     const u = await prisma.user.create({
       data: {
@@ -601,7 +630,8 @@ async function main() {
 
   // ── 6. Print credentials ────────────────────────────────────────────────────
   const allCreds = [
-    { role: 'ADMIN',      email: ADMIN_CRED.email,        password: ADMIN_CRED.password },
+    { role: 'CITY-ADMIN',  email: CITY_ADMIN_CRED.email,  password: CITY_ADMIN_CRED.password },
+    ...WARD_ADMIN_CREDS.map(u => ({ role: 'WARD-ADMIN',  email: u.email, password: u.password })),
     ...OFFICER_CREDS.map(u => ({ role: 'OFFICER',     email: u.email, password: u.password })),
     ...INSPECTOR_CREDS.map(u => ({ role: 'INSPECTOR',  email: u.email, password: u.password })),
     ...CONTRACTOR_CREDS.map(u => ({ role: 'CONTRACTOR', email: u.email, password: u.password })),
