@@ -6,7 +6,7 @@
 import crypto from 'crypto';
 import { prisma } from '../prisma/client';
 import { AppError } from '../middleware/error.middleware';
-import { NotificationChannel } from '../generated/prisma/client.js';
+import { NotificationChannel, Role } from '../generated/prisma/client.js';
 import { haversineDistance } from '../utils/geo.util';
 import { parseResidentsCsv, ResidentRow } from '../utils/csv.util';
 import { config } from '../config';
@@ -93,4 +93,42 @@ export async function notifyNearbyResidents(
   });
 
   return { notified: logs.length, logs };
+}
+
+// ─── In-app user notifications ────────────────────────────────────────────────
+
+/**
+ * Create a single in-app notification for a user.
+ */
+export async function notify(
+  userId: string,
+  title: string,
+  body: string,
+  meta?: { issueId?: string; projectId?: string },
+) {
+  return prisma.userNotification.create({
+    data: {
+      userId,
+      title,
+      body,
+      issueId: meta?.issueId,
+      projectId: meta?.projectId,
+    },
+  });
+}
+
+/**
+ * Notify all OFFICER + ADMIN users assigned to a ward.
+ */
+export async function notifyWardOfficers(
+  wardId: string,
+  title: string,
+  body: string,
+  meta?: { issueId?: string; projectId?: string },
+) {
+  const staff = await prisma.user.findMany({
+    where: { adminUnitId: wardId, role: { in: [Role.OFFICER, Role.ADMIN] } },
+    select: { id: true },
+  });
+  await Promise.all(staff.map((u) => notify(u.id, title, body, meta)));
 }

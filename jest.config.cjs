@@ -15,6 +15,8 @@ module.exports = {
   moduleNameMapper: {
     // Redirect .js extension imports for generated prisma client to the .ts file
     '^(.*generated/prisma/client)\\.js$': '$1',
+    // Allow .js extension imports for local TypeScript modules
+    '^(\\.{1,2}/.*)\\.js$': '$1',
   },
   verbose: true,
 };

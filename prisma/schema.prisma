@@ -47,6 +47,7 @@ model User {
   createdProjects  Project[]      @relation("ProjectCreator")
   adminUnit        AdminUnit?     @relation(fields: [adminUnitId], references: [id])
   verifications    Verification[]
+  notifications    UserNotification[]
 
   @@index([role])
   @@index([adminUnitId])
@@ -62,10 +63,11 @@ model Project {
   budget      Decimal?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
-  auditLogs   AuditLog[]
-  issues      Issue[]
-  adminUnit   AdminUnit     @relation(fields: [adminUnitId], references: [id])
-  createdBy   User          @relation("ProjectCreator", fields: [createdById], references: [id])
+  auditLogs         AuditLog[]
+  issues            Issue[]
+  userNotifications UserNotification[]
+  adminUnit         AdminUnit     @relation(fields: [adminUnitId], references: [id])
+  createdBy         User          @relation("ProjectCreator", fields: [createdById], references: [id])
 
   @@index([adminUnitId])
   @@index([status])
@@ -106,8 +108,9 @@ model Issue {
   duplicates       Issue[]           @relation("IssueDuplicate")
   project          Project?          @relation(fields: [projectId], references: [id])
   ward             AdminUnit         @relation(fields: [wardId], references: [id])
-  notificationLogs NotificationLog[]
-  verification     Verification?
+  notificationLogs  NotificationLog[]
+  userNotifications UserNotification[]
+  verification      Verification?
 
   @@index([wardId])
   @@index([status])
@@ -248,6 +251,24 @@ enum NotificationChannel {
   SMS
   WHATSAPP
   SYSTEM
+}
+
+/// In-app notifications for platform users (citizens, officers, inspectors, etc.)
+model UserNotification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  body      String
+  issueId   String?
+  projectId String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  issue     Issue?   @relation(fields: [issueId], references: [id])
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  @@index([userId])
+  @@index([userId, read])
 }
 
 model EmailOtp {

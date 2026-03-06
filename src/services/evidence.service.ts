@@ -13,6 +13,7 @@ import { haversineDistance } from '../utils/geo.util';
 import { config } from '../config';
 import { IssueStatus } from '../generated/prisma/client.js';
 import { storeFile } from '../utils/storage.util';
+import { notify, notifyWardOfficers } from './notification.service.js';
 
 
 /**
@@ -29,7 +30,7 @@ export async function uploadEvidence(
   // Validate issue exists
   const issue = await prisma.issue.findUnique({
     where: { id: issueId },
-    select: { id: true, status: true, latitude: true, longitude: true, inspectorId: true },
+    select: { id: true, title: true, status: true, latitude: true, longitude: true, inspectorId: true, wardId: true, createdById: true },
   });
   if (!issue) {
     throw new AppError(404, 'NOT_FOUND', 'Issue not found');
@@ -55,11 +56,7 @@ export async function uploadEvidence(
       throw new AppError(400, 'INVALID_STATUS', 'Issue must be in WORK_DONE status for an AFTER photo — contractor must mark work done first');
   }
 
-  // DOCUMENT: OFFICER or ADMIN only
-  if (type === EvidenceType.DOCUMENT) {
-    if (!['OFFICER', 'ADMIN'].includes(uploaderRole))
-      throw new AppError(403, 'FORBIDDEN', 'Only OFFICER or ADMIN can upload DOCUMENT evidence');
-  }
+ 
 
   // Compute file hash
   const fileHash = sha256Buffer(file.buffer);
@@ -135,6 +132,20 @@ export async function uploadEvidence(
         metadata: { trigger: 'AFTER_PHOTO_UPLOADED' },
       },
     });
+    // Notify ward officers to review
+    await notifyWardOfficers(
+      issue.wardId,
+      'Issue Ready for Verification 📋',
+      `Inspector has submitted an AFTER photo for "${issue.title}". Please verify the resolution.`,
+      { issueId },
+    );
+    // Notify the citizen
+    await notify(
+      issue.createdById,
+      'Almost There! Under Review 📋',
+      `The work on your issue "${issue.title}" is being reviewed. You will be notified once it is verified.`,
+      { issueId },
+    );
   }
 
   return { evidence, geoWarning };

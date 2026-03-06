@@ -7,6 +7,7 @@ import { prisma } from '../prisma/client';
 import { AppError } from '../middleware/error.middleware';
 import { IssueStatus, ProjectStatus, Role, EvidenceType } from '../generated/prisma/client.js';
 import { config } from '../config';
+import { notify, notifyWardOfficers } from './notification.service.js';
 
 export interface CreateIssueInput {
   title: string;
@@ -88,6 +89,14 @@ export async function createIssue(input: CreateIssueInput) {
     },
   });
 
+  // Notify all officers in the ward about the new issue
+  await notifyWardOfficers(
+    input.wardId,
+    'New Issue Reported',
+    `"${issue.title}" has been submitted in your ward (${issue.ward.name}).`,
+    { issueId: issue.id },
+  );
+
   return issue;
 }
 
@@ -140,6 +149,14 @@ export async function acceptIssue(
       },
     }),
   ]);
+
+  // Notify the citizen who raised the issue
+  await notify(
+    issue.createdById,
+    'Issue Accepted ✓',
+    `Your issue "${issue.title}" has been accepted and is now being processed.`,
+    { issueId },
+  );
 
   return updated;
 }
@@ -198,6 +215,14 @@ export async function rejectIssue(
       },
     }),
   ]);
+
+  // Notify the citizen who raised the issue
+  await notify(
+    issue.createdById,
+    'Issue Rejected',
+    `Your issue "${issue.title}" was rejected. Reason: ${reason.trim()}`,
+    { issueId },
+  );
 
   return updated;
 }
@@ -304,6 +329,14 @@ export async function assignIssue(issueId: string, actorId: string, input: Assig
     }),
   ]);
 
+  // Notify the officer who was assigned
+  await notify(
+    input.assignedToId,
+    'Issue Assigned to You',
+    `You have been assigned to handle issue "${issue.title}". SLA: ${slaHours} hours.`,
+    { issueId },
+  );
+
   return updated;
 }
 
@@ -360,6 +393,14 @@ export async function convertIssueToProject(
       },
     }),
   ]);
+
+  // Notify the citizen who raised the issue
+  await notify(
+    issue.createdById,
+    'Issue Upgraded to Project 🏗️',
+    `Your issue "${issue.title}" has been converted into a project: "${input.title}".`,
+    { issueId, projectId: project.id },
+  );
 
   return project;
 }
@@ -433,6 +474,22 @@ export async function assignInspector(issueId: string, actorId: string, inspecto
     }),
   ]);
 
+  // Notify the inspector
+  await notify(
+    inspectorId,
+    'Inspection Assignment',
+    `You have been assigned to inspect issue "${issue.title}". Please upload a BEFORE photo.`,
+    { issueId },
+  );
+
+  // Notify the citizen
+  await notify(
+    issue.createdById,
+    'Inspector Assigned 🔍',
+    `An inspector has been assigned to your issue "${issue.title}". Site inspection is underway.`,
+    { issueId },
+  );
+
   return updated;
 }
 
@@ -475,6 +532,22 @@ export async function hireContractor(issueId: string, actorId: string, contracto
     }),
   ]);
 
+  // Notify the contractor
+  await notify(
+    contractorId,
+    'Work Assignment',
+    `You have been hired to fix issue "${issue.title}". Please complete the work and mark it as done.`,
+    { issueId },
+  );
+
+  // Notify the citizen
+  await notify(
+    issue.createdById,
+    'Work In Progress 🚧',
+    `A contractor has been assigned and work has begun on your issue "${issue.title}".`,
+    { issueId },
+  );
+
   return updated;
 }
 
@@ -505,6 +578,22 @@ export async function markWorkDone(issueId: string, actorId: string) {
       },
     }),
   ]);
+
+  // Notify ward officers that the contractor has finished
+  await notifyWardOfficers(
+    issue.wardId,
+    'Work Completed 🔨',
+    `Contractor has marked work done for issue "${issue.title}". Inspector must now submit an AFTER photo.`,
+    { issueId },
+  );
+
+  // Notify the citizen
+  await notify(
+    issue.createdById,
+    'Work Completed 🔨',
+    `The contractor has finished work on your issue "${issue.title}". A final inspection is now in progress.`,
+    { issueId },
+  );
 
   return updated;
 }

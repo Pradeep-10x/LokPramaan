@@ -6,6 +6,7 @@ import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma/client';
 import { AppError } from '../middleware/error.middleware';
 import { IssueStatus, VerificationVerdict, Evidence } from '../generated/prisma/client.js';
+import { notify } from '../services/notification.service.js';
 
 interface IssueWithRelations {
   id: string;
@@ -30,6 +31,7 @@ export async function verifyIssue(req: Request, res: Response, next: NextFunctio
       include: {
         evidence: true,
         verification: true,
+        createdBy: { select: { id: true } },
       },
     }) as IssueWithRelations | null;
 
@@ -94,6 +96,26 @@ export async function verifyIssue(req: Request, res: Response, next: NextFunctio
     ]);
 
     res.json({ verification, newStatus });
+
+    // Notify the citizen who raised the issue
+    const citizenId = (issue as any).createdBy?.id;
+    if (citizenId) {
+      if (verdict === 'APPROVED') {
+        await notify(
+          citizenId,
+          'Issue Resolved ✅',
+          `Great news! Your issue (ID: ${id}) has been verified and marked as resolved.`,
+          { issueId: id },
+        );
+      } else {
+        await notify(
+          citizenId,
+          'Issue Needs More Work',
+          `Your issue (ID: ${id}) could not be verified. Work will continue — you will be updated again.`,
+          { issueId: id },
+        );
+      }
+    }
   } catch (err) {
     next(err);
   }
