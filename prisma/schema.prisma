@@ -9,15 +9,17 @@ datasource db {
 
 // this is administrative builing// kind of work station 
 model AdminUnit {
-  id       String        @id @default(uuid())
-  name     String
-  type     AdminUnitType
-  parentId String?
-  parent   AdminUnit?    @relation("AdminUnitTree", fields: [parentId], references: [id])
-  children AdminUnit[]   @relation("AdminUnitTree")
-  issues   Issue[]
-  projects Project[]
-  users    User[]
+  id        String        @id @default(uuid())
+  name      String
+  type      AdminUnitType
+  parentId  String?
+  centerLat Float?
+  centerLng Float?
+  parent    AdminUnit?    @relation("AdminUnitTree", fields: [parentId], references: [id])
+  children  AdminUnit[]   @relation("AdminUnitTree")
+  issues    Issue[]
+  projects  Project[]
+  users     User[]
 
   @@unique([name, parentId])
   @@index([parentId])
