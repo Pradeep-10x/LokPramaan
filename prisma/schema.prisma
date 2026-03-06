@@ -7,6 +7,7 @@ datasource db {
   provider = "postgresql"
 }
 
+// this is administrative builing// kind of work station 
 model AdminUnit {
   id       String        @id @default(uuid())
   name     String
@@ -29,12 +30,14 @@ model User {
   email            String?        @unique
   passwordHash     String
   role             Role           @default(CITIZEN)
-  isEmailVerified Boolean @default(false)
+  isEmailVerified  Boolean        @default(false)
   adminUnitId      String?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   auditActions     AuditLog[]     @relation("AuditActor")
   uploadedEvidence Evidence[]
+  acceptedIssues   Issue[]        @relation("IssueAcceptedBy")
+  rejectedIssues   Issue[]        @relation("IssueRejectedBy")
   assignedIssues   Issue[]        @relation("IssueAssignee")
   createdIssues    Issue[]        @relation("IssueCreator")
   createdProjects  Project[]      @relation("ProjectCreator")
@@ -50,7 +53,7 @@ model Project {
   title       String
   description String
   status      ProjectStatus @default(PROPOSED)
-  adminUnitId String
+  adminUnitId String 
   createdById String
   budget      Decimal?
   createdAt   DateTime      @default(now())
@@ -74,6 +77,11 @@ model Issue {
   projectId        String?
   createdById      String
   assignedToId     String?
+  acceptedById     String?
+  acceptedAt       DateTime?
+  rejectedById     String?
+  rejectedAt       DateTime?
+  rejectionReason  String?
   slaDeadline      DateTime?
   latitude         Float
   longitude        Float
@@ -82,6 +90,8 @@ model Issue {
   updatedAt        DateTime          @updatedAt
   auditLogs        AuditLog[]
   evidence         Evidence[]
+  acceptedBy       User?             @relation("IssueAcceptedBy", fields: [acceptedById], references: [id])
+  rejectedBy       User?             @relation("IssueRejectedBy", fields: [rejectedById], references: [id])
   assignedTo       User?             @relation("IssueAssignee", fields: [assignedToId], references: [id])
   createdBy        User              @relation("IssueCreator", fields: [createdById], references: [id])
   duplicateOf      Issue?            @relation("IssueDuplicate", fields: [duplicateOfId], references: [id])
@@ -202,6 +212,8 @@ enum ProjectStatus {
 
 enum IssueStatus {
   OPEN
+  ACCEPTED
+  REJECTED
   ASSIGNED
   IN_PROGRESS
   COMPLETED
@@ -223,8 +235,6 @@ enum NotificationChannel {
   WHATSAPP
   SYSTEM
 }
-
-
 
 model EmailOtp {
   id        String   @id @default(cuid())

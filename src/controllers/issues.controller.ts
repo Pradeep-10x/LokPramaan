@@ -50,6 +50,31 @@ export async function assign(req: Request, res: Response, next: NextFunction) {
   }
 }
 
+export async function accept(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = req.params.id as string;
+    const result = await issueService.acceptIssue(id, req.user!.id, req.user!.adminUnitId);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function reject(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = req.params.id as string;
+    const result = await issueService.rejectIssue(
+      id,
+      req.user!.id,
+      req.user!.adminUnitId,
+      req.body.reason,
+    );
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function convert(req: Request, res: Response, next: NextFunction) {
   try {
     const id = req.params.id as string;

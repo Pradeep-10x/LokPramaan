@@ -117,7 +117,7 @@ describe('Issue Lifecycle Integration', () => {
   });
 
   // ─── Step 4: Create issue ─────────────────────────────
-  it('should create an issue and auto-assign to ward officer', async () => {
+  it('should create an issue with status OPEN', async () => {
     const res = await request(app)
       .post('/api/issues')
       .set('Authorization', `Bearer ${citizenToken}`)
@@ -131,9 +131,19 @@ describe('Issue Lifecycle Integration', () => {
       .expect(201);
 
     expect(res.body.id).toBeDefined();
-    expect(res.body.status).toBe('ASSIGNED');
-    expect(res.body.assignedTo).toBeTruthy();
+    expect(res.body.status).toBe('OPEN');
     issueId = res.body.id;
+  });
+
+  // ─── Step 4.5: Officer accepts issue ──────────────────
+  it('should accept the issue (officer review)', async () => {
+    const res = await request(app)
+      .patch(`/api/issues/${issueId}/accept`)
+      .set('Authorization', `Bearer ${officerToken}`)
+      .expect(200);
+
+    expect(res.body.status).toBe('ACCEPTED');
+    expect(res.body.acceptedBy).toBeTruthy();
   });
 
   // ─── Step 5: Upload BEFORE evidence ───────────────────
@@ -210,6 +220,34 @@ describe('Issue Lifecycle Integration', () => {
       .expect(200);
 
     expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.length).toBeGreaterThanOrEqual(4); // create, evidence x2, assign, verify
+    expect(res.body.length).toBeGreaterThanOrEqual(4); // create, accept, evidence x2, assign, verify
+  });
+
+  // ─── Step 11: Rejection flow (separate issue) ─────────
+  it('should reject a new issue with a reason', async () => {
+    // Create a second issue to test rejection
+    const createRes = await request(app)
+      .post('/api/issues')
+      .set('Authorization', `Bearer ${citizenToken}`)
+      .send({
+        title: 'Broken streetlight',
+        description: 'Not a valid municipal issue',
+        latitude: 26.8500,
+        longitude: 80.9500,
+        wardId: ward12Id,
+      })
+      .expect(201);
+
+    expect(createRes.body.status).toBe('OPEN');
+
+    const rejectRes = await request(app)
+      .patch(`/api/issues/${createRes.body.id}/reject`)
+      .set('Authorization', `Bearer ${officerToken}`)
+      .send({ reason: 'This falls outside municipal jurisdiction' })
+      .expect(200);
+
+    expect(rejectRes.body.status).toBe('REJECTED');
+    expect(rejectRes.body.rejectionReason).toBe('This falls outside municipal jurisdiction');
+    expect(rejectRes.body.rejectedBy).toBeTruthy();
   });
 });

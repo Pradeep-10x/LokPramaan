@@ -9,6 +9,7 @@ export async function create(req: Request, res: Response, next: NextFunction) {
   try {
     const result = await projectService.createProject({
       ...req.body,
+      adminUnitId: req.user!.adminUnitId,
       createdById: req.user!.id,
     });
     res.status(201).json(result);

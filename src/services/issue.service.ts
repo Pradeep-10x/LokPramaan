@@ -30,7 +30,9 @@ export interface ConvertInput {
 }
 
 /**
- * Create a new issue with auto-assignment to ward officer.
+ * Create a new issue. Status always starts as OPEN.
+ * An officer may be pre-routed via assignedToId for dashboard visibility,
+ * but the issue must be explicitly accepted before work begins.
  */
 export async function createIssue(input: CreateIssueInput) {
   // Validate ward exists and is type WARD
@@ -39,15 +41,11 @@ export async function createIssue(input: CreateIssueInput) {
     throw new AppError(400, 'INVALID_WARD', 'wardId must reference an existing WARD');
   }
 
-  // Find an officer assigned to this ward for auto-assignment
+  // Find an officer assigned to this ward for dashboard routing
   const officer = await prisma.user.findFirst({
     where: { adminUnitId: input.wardId, role: Role.OFFICER },
     orderBy: { createdAt: 'asc' },
   });
-
-  const slaDeadline = officer
-    ? new Date(Date.now() + config.slaDefaultHours * 60 * 60 * 1000)
-    : null;
 
   const issue = await prisma.issue.create({
     data: {
@@ -59,8 +57,7 @@ export async function createIssue(input: CreateIssueInput) {
       wardId: input.wardId,
       createdById: input.createdById,
       assignedToId: officer?.id,
-      status: officer ? IssueStatus.ASSIGNED : IssueStatus.OPEN,
-      slaDeadline,
+      status: IssueStatus.OPEN,
     },
     include: {
       ward: { select: { id: true, name: true } },
@@ -76,14 +73,124 @@ export async function createIssue(input: CreateIssueInput) {
       actorId: input.createdById,
       action: 'ISSUE_CREATED',
       metadata: {
-        autoAssigned: !!officer,
-        assignedToId: officer?.id ?? null,
+        routedToOfficer: officer?.id ?? null,
         status: issue.status,
       },
     },
   });
 
   return issue;
+}
+
+/**
+ * Accept an issue (OFFICER/ADMIN action).
+ * Transitions status from OPEN → ACCEPTED and records the accepting user.
+ */
+export async function acceptIssue(
+  issueId: string,
+  actorId: string,
+  actorAdminUnitId: string | null,
+) {
+  const issue = await prisma.issue.findUnique({ where: { id: issueId } });
+  if (!issue) {
+    throw new AppError(404, 'NOT_FOUND', 'Issue not found');
+  }
+
+  if (issue.status !== IssueStatus.OPEN) {
+    throw new AppError(400, 'INVALID_STATUS', 'Only OPEN issues can be accepted');
+  }
+
+  // Ward-match check: actor must belong to the same ward as the issue
+  if (!actorAdminUnitId || actorAdminUnitId !== issue.wardId) {
+    throw new AppError(403, 'FORBIDDEN', 'You can only accept issues in your own ward');
+  }
+
+  const now = new Date();
+
+  const [updated] = await prisma.$transaction([
+    prisma.issue.update({
+      where: { id: issueId },
+      data: {
+        status: IssueStatus.ACCEPTED,
+        acceptedById: actorId,
+        acceptedAt: now,
+      },
+      include: {
+        ward: { select: { id: true, name: true } },
+        createdBy: { select: { id: true, name: true } },
+        assignedTo: { select: { id: true, name: true } },
+        acceptedBy: { select: { id: true, name: true } },
+      },
+    }),
+    prisma.auditLog.create({
+      data: {
+        issueId,
+        actorId,
+        action: 'ISSUE_ACCEPTED',
+        metadata: { previousStatus: issue.status },
+      },
+    }),
+  ]);
+
+  return updated;
+}
+
+/**
+ * Reject an issue (OFFICER/ADMIN action).
+ * Transitions status from OPEN → REJECTED with a mandatory reason.
+ */
+export async function rejectIssue(
+  issueId: string,
+  actorId: string,
+  actorAdminUnitId: string | null,
+  reason: string,
+) {
+  const issue = await prisma.issue.findUnique({ where: { id: issueId } });
+  if (!issue) {
+    throw new AppError(404, 'NOT_FOUND', 'Issue not found');
+  }
+
+  if (issue.status !== IssueStatus.OPEN) {
+    throw new AppError(400, 'INVALID_STATUS', 'Only OPEN issues can be rejected');
+  }
+
+  if (!actorAdminUnitId || actorAdminUnitId !== issue.wardId) {
+    throw new AppError(403, 'FORBIDDEN', 'You can only reject issues in your own ward');
+  }
+
+  if (!reason || reason.trim().length === 0) {
+    throw new AppError(400, 'MISSING_REASON', 'A reason is required when rejecting an issue');
+  }
+
+  const now = new Date();
+
+  const [updated] = await prisma.$transaction([
+    prisma.issue.update({
+      where: { id: issueId },
+      data: {
+        status: IssueStatus.REJECTED,
+        rejectedById: actorId,
+        rejectedAt: now,
+        rejectionReason: reason.trim(),
+      },
+      include: {
+        ward: { select: { id: true, name: true } },
+        createdBy: { select: { id: true, name: true } },
+        assignedTo: { select: { id: true, name: true } },
+        rejectedBy: { select: { id: true, name: true } },
+      },
+    }),
+    prisma.auditLog.create({
+      data: {
+        issueId,
+        actorId,
+        action: 'ISSUE_REJECTED',
+        metadata: { reason: reason.trim() },
+      },
+    }),
+  ]);
+
+  return updated;
 }
 
 /**
