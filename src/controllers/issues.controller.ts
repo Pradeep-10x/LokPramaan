@@ -10,6 +10,7 @@ export async function create(req: Request, res: Response, next: NextFunction) {
     const result = await issueService.createIssue({
       ...req.body,
       createdById: req.user!.id,
+      projectId: req.params.projectId ?? req.body.projectId ?? undefined,
     });
     res.status(201).json(result);
   } catch (err) {
@@ -17,18 +18,25 @@ export async function create(req: Request, res: Response, next: NextFunction) {
   }
 }
 
+
+// ...existing code...
 export async function list(req: Request, res: Response, next: NextFunction) {
   try {
+    const rawProjectId = req.params.projectId ?? req.query.projectId;
+    const projectId = typeof rawProjectId === 'string' ? rawProjectId : undefined;
+
     const result = await issueService.listIssues({
       wardId: req.query.wardId as string | undefined,
       status: req.query.status as any,
       assignedToId: req.query.assignedTo as string | undefined,
+      projectId,
     });
     res.json(result);
   } catch (err) {
     next(err);
   }
 }
+// ...existing code...
 
 export async function getById(req: Request, res: Response, next: NextFunction) {
   try {

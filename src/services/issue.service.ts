@@ -16,6 +16,7 @@ export interface CreateIssueInput {
   longitude: number;
   wardId: string;
   createdById: string;
+  projectId?: string;
 }
 
 export interface AssignInput {
@@ -40,6 +41,13 @@ export async function createIssue(input: CreateIssueInput) {
   if (!ward || ward.type !== 'WARD') {
     throw new AppError(400, 'INVALID_WARD', 'wardId must reference an existing WARD');
   }
+   
+  if (input.projectId) {
+    const project = await prisma.project.findUnique({ where: { id: input.projectId } });
+    if (!project) {
+      throw new AppError(400, 'INVALID_PROJECT', 'Project not found');
+    }
+  }
 
   // Find an officer assigned to this ward for dashboard routing
   const officer = await prisma.user.findFirst({
@@ -58,6 +66,7 @@ export async function createIssue(input: CreateIssueInput) {
       createdById: input.createdById,
       assignedToId: officer?.id,
       status: IssueStatus.OPEN,
+      projectId: input.projectId,
     },
     include: {
       ward: { select: { id: true, name: true } },
@@ -200,12 +209,14 @@ export async function listIssues(filters: {
   wardId?: string;
   status?: IssueStatus;
   assignedToId?: string;
+  projectId?: string;
 }) {
   return prisma.issue.findMany({
     where: {
       ...(filters.wardId && { wardId: filters.wardId }),
       ...(filters.status && { status: filters.status }),
       ...(filters.assignedToId && { assignedToId: filters.assignedToId }),
+       ...(filters.projectId && { projectId: filters.projectId }),
     },
     include: {
       ward: { select: { id: true, name: true } },
