@@ -14,6 +14,7 @@ import { config } from '../config';
 import { IssueStatus } from '../generated/prisma/client.js';
 import { storeFile } from '../utils/storage.util';
 import { notify, notifyWardOfficers } from './notification.service.js';
+import { checkPhotoFraud, persistFraudFlag } from './fraud.service.js';
 
 
 /**
@@ -88,6 +89,11 @@ export async function uploadEvidence(
   // Save file (Cloudinary in production, local disk in dev)
   const fileUrl = await storeFile(file.buffer, file.originalname, 'evidence');
 
+  // ── Perceptual hash + fraud detection ──────────────────────────────────
+  // Always compute pHash (used both for storage and later fraud cross-checks).
+  // For AFTER photos, also run the full fraud analysis before committing.
+  const fraudResult = await checkPhotoFraud(file.buffer, issueId, type);
+
   // Create evidence record
   const evidence = await prisma.evidence.create({
     data: {
@@ -95,6 +101,7 @@ export async function uploadEvidence(
       type,
       fileUrl,
       fileHash,
+      pHash:    fraudResult.pHash,   // store hash for future cross-checks
       latitude: evidenceLat,
       longitude: evidenceLon,
       exifTime: exif.datetime,
@@ -102,6 +109,17 @@ export async function uploadEvidence(
       uploadedById: uploaderId,
     },
   });
+
+  // If fraud was detected, flag the record and alert ward staff
+  if (fraudResult.fraudDetected) {
+    await persistFraudFlag(
+      evidence.id,
+      issueId,
+      issue.title,
+      issue.wardId,
+      fraudResult,
+    );
+  }
 
   // Audit log
   await prisma.auditLog.create({

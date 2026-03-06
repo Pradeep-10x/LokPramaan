@@ -9,6 +9,7 @@ import { IssueStatus, ProjectStatus, Role, EvidenceType } from '../generated/pri
 import { config } from '../config';
 import { notify, notifyWardOfficers } from './notification.service.js';
 import { haversineDistance } from '../utils/geo.util.js';
+import { classifyDepartment, type ClassificationResult } from './classification.service.js';
 
 /** Issues within this radius (metres) are flagged as potential duplicates on creation. */
 const DUPLICATE_RADIUS_METRES = 100;
@@ -37,7 +38,8 @@ export function getProgressScore(status: IssueStatus): number {
 export interface CreateIssueInput {
   title: string;
   description?: string;
-  department: string;
+  /** Optional — if omitted the department is auto-classified from title + description. */
+  department?: string;
   latitude: number;
   longitude: number;
   wardId: string;
@@ -62,6 +64,14 @@ export interface ConvertInput {
  * but the issue must be explicitly accepted before work begins.
  */
 export async function createIssue(input: CreateIssueInput) {
+  // ── Auto-classify department ──────────────────────────────────────────────
+  const classification = classifyDepartment(
+    input.title,
+    input.description,
+    input.department,          // undefined → auto-classify; provided → honour as-is
+  );
+  const resolvedDepartment = classification.department;
+
   // Validate ward exists and is type WARD
   const ward = await prisma.adminUnit.findUnique({ where: { id: input.wardId } });
   if (!ward || ward.type !== 'WARD') {
@@ -85,7 +95,7 @@ export async function createIssue(input: CreateIssueInput) {
     data: {
       title: input.title,
       description: input.description,
-      department: input.department as any,
+      department: resolvedDepartment as any,
       latitude: input.latitude,
       longitude: input.longitude,
       wardId: input.wardId,
@@ -152,7 +162,7 @@ export async function createIssue(input: CreateIssueInput) {
     );
   }
 
-  return { ...issue, progressScore: getProgressScore(issue.status), potentialDuplicates };
+  return { ...issue, progressScore: getProgressScore(issue.status), potentialDuplicates, classification };
 }
 
 /**

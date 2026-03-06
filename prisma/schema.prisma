@@ -127,6 +127,9 @@ model Evidence {
   type         EvidenceType
   fileUrl      String
   fileHash     String
+  pHash        String?      // perceptual hash (dHash) for fraud detection
+  fraudFlag    Boolean      @default(false)
+  fraudReason  String?
   latitude     Float?
   longitude    Float?
   exifTime     DateTime?
@@ -138,6 +141,7 @@ model Evidence {
 
   @@index([issueId])
   @@index([type])
+  @@index([pHash])
 }
 
 model Verification {
