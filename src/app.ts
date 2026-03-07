@@ -5,18 +5,10 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
-import winston from 'winston';
+import { logger } from './utils/logger.js';
 
-// ─── Logger ───────────────────────────────────────────────
-export const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.errors({ stack: true }),
-    winston.format.json(),
-  ),
-  transports: [new winston.transports.Console({ format: winston.format.simple() })],
-});
+// ─── Logger (re-exported for consumers that import from app) ──────────────
+export { logger };
 
 import { config } from './config';
 import { prisma } from './prisma/client';
@@ -46,6 +38,7 @@ verificationRouter.post('/:id/verify', authMiddleware, requireRole('OFFICER', 'A
 
 // ─── App ──────────────────────────────────────────────────
 const app = express();
+app.set('trust proxy', true); // Trust X-Forwarded-* headers, important if behind a proxy like Nginx or in production environments
 
 // Global middleware
 app.use(cors());

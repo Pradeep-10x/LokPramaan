@@ -50,12 +50,15 @@ export async function listByUnit(req: Request, res: Response, next: NextFunction
     const adminUnitId = req.query.adminUnitId as string | undefined;
     const role        = req.query.role        as string | undefined;
 
+    const ALLOWED_ROLES = ['OFFICER', 'INSPECTOR', 'CONTRACTOR', 'ADMIN'];
+    const roleFilter = role && ALLOWED_ROLES.includes(role)
+      ? (role as any)
+      : { in: ALLOWED_ROLES };
+
     const users = await prisma.user.findMany({
       where: {
         ...(adminUnitId && { adminUnitId }),
-        ...(role        && { role: role as any }),
-        // never expose CITIZEN passwords etc in this admin list
-        role: role ? (role as any) : { in: ['OFFICER', 'INSPECTOR', 'CONTRACTOR', 'ADMIN'] },
+        role: roleFilter,
       },
       select: {
         id: true, name: true, email: true, role: true,

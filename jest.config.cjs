@@ -3,6 +3,9 @@ module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
   testMatch: ['**/*.test.ts'],
+  setupFilesAfterEnv: ['<rootDir>/src/test/setup.ts'],
+  testTimeout: 15000,
+  maxWorkers: 1, // Run tests sequentially to avoid DB conflicts
   transform: {
     '^.+\\.tsx?$': ['@swc/jest', {
       jsc: {

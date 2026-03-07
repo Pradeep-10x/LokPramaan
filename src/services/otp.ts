@@ -80,6 +80,7 @@ export async function verifyOtp(email: string, otp: string): Promise<boolean> {
 }
 
 export async function isEmailVerified(email: string): Promise<boolean> {
+  if (!email) return false;
   const record = await prisma.emailOtp.findFirst({
     where: {
       email,
