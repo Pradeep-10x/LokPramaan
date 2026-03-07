@@ -12,6 +12,13 @@ export const config = {
   uploadDir: process.env.UPLOAD_DIR || './uploads',
   residentPhoneSalt: process.env.RESIDENT_PHONE_SALT || 'default_salt',
 
+  /**
+   * Comma-separated list of allowed CORS origins.
+   * e.g. CORS_ORIGIN=https://your-frontend.vercel.app,http://localhost:3000
+   * Defaults to '*' if not set (development convenience).
+   */
+  corsOrigin: process.env.CORS_ORIGIN || '*',
+
   /** Default SLA window for issue auto-assignment (hours) */
   slaDefaultHours: parseInt(process.env.SLA_DEFAULT_HOURS || '48', 10),
 

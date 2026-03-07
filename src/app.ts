@@ -40,8 +40,12 @@ verificationRouter.post('/:id/verify', authMiddleware, requireRole('OFFICER', 'A
 const app = express();
 app.set('trust proxy', true); // Trust X-Forwarded-* headers, important if behind a proxy like Nginx or in production environments
 
-// Global middleware
-app.use(cors());
+// Global middleware — open to all origins
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
