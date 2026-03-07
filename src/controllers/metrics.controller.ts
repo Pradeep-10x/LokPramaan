@@ -15,6 +15,9 @@ export async function getMetrics(req: Request, res: Response, next: NextFunction
     const verifiedIssues = await prisma.issue.count({ 
       where: { ...baseWhere, status: IssueStatus.VERIFIED } 
     });
+    const openIssues = await prisma.issue.count({
+      where: { ...baseWhere, status: IssueStatus.OPEN }
+    });
     
     // Ongoing issues: Accepted, Assigned, In_Progress, Work_Done 
     const ongoingIssues = await prisma.issue.count({
@@ -64,6 +67,7 @@ export async function getMetrics(req: Request, res: Response, next: NextFunction
 
     res.json({
       total_issues: totalIssues,
+      open_issues: openIssues,
       ongoing_issues: ongoingIssues,
       verified_issues: verifiedIssues,
       verified_percent: totalIssues > 0 ? Math.round((verifiedIssues / totalIssues) * 10000) / 100 : 0,
@@ -89,6 +93,9 @@ export async function getAdvancedMetrics(req: Request, res: Response, next: Next
     const totalIssues = await prisma.issue.count({ where: baseWhere });
     const verifiedIssues = await prisma.issue.count({ 
       where: { ...baseWhere, status: IssueStatus.VERIFIED } 
+    });
+    const openIssues = await prisma.issue.count({
+      where: { ...baseWhere, status: IssueStatus.OPEN }
     });
 
     // Ongoing issues: Accepted, Assigned, In_Progress, Work_Done 
@@ -221,6 +228,7 @@ export async function getAdvancedMetrics(req: Request, res: Response, next: Next
 
     res.json({
       total_issues: totalIssues,
+      open_issues: openIssues,
       ongoing_issues: ongoingIssues,
       verified_issues: verifiedIssues,
       verified_percent: totalIssues > 0 ? Math.round((verifiedIssues / totalIssues) * 10000) / 100 : 0,
