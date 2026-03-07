@@ -22,6 +22,7 @@ router.post('/:id/hire-contractor', authMiddleware, requireRole('OFFICER', 'ADMI
 router.patch('/:id/work-done', authMiddleware, requireRole('CONTRACTOR'), issuesCtrl.markWorkDone);
 router.post('/:id/convert', authMiddleware, requireRole('OFFICER' , 'ADMIN'), issuesCtrl.convert);
 router.post('/:id/toggle-duplicate', authMiddleware, requireRole('OFFICER', 'ADMIN'), issuesCtrl.toggleDuplicate);
+router.post('/:id/evidence', authMiddleware, upload.single('photo'), issuesCtrl.uploadEvidence);
 router.get('/:id/timeline', issuesCtrl.getTimeline);
 
 export default router;

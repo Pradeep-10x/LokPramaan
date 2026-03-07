@@ -349,16 +349,29 @@ export async function listIssues(filters: {
   wardId?: string;
   status?: IssueStatus;
   assignedToId?: string;
+  inspectorId?: string;
+  contractorId?: string;
   projectId?: string;
   createdById?: string;
 }) {
+  
+  // If an assignment filter is provided (which maps to assignedToId, inspectorId, or contractorId from the controller),
+  // we want to return issues where the user matches ANY of those roles.
+  const assignmentOrClause = (filters.assignedToId || filters.inspectorId || filters.contractorId) 
+    ? [
+        { assignedToId: filters.assignedToId || undefined },
+        { inspectorId: filters.inspectorId || undefined },
+        { contractorId: filters.contractorId || undefined }
+      ].filter(condition => Object.values(condition)[0] !== undefined)
+    : undefined;
+
   const issues = await prisma.issue.findMany({
     where: {
       ...(filters.wardId      && { wardId:       filters.wardId }),
       ...(filters.status      && { status:       filters.status }),
-      ...(filters.assignedToId && { assignedToId: filters.assignedToId }),
       ...(filters.projectId   && { projectId:    filters.projectId }),
       ...(filters.createdById && { createdById:  filters.createdById }),
+      ...(assignmentOrClause && assignmentOrClause.length > 0 && { OR: assignmentOrClause })
     },
     include: {
       ward: { select: { id: true, name: true } },

@@ -112,6 +112,38 @@ export async function create(req: Request, res: Response, next: NextFunction) {
   }
 }
 
+export async function uploadEvidence(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = req.params.id as string;
+    const type = req.body.type as EvidenceType;
+
+    if (!req.file) {
+      res.status(400).json({ error: 'NO_FILE', message: 'Photo evidence is required' });
+      return;
+    }
+
+    const deviceLat = req.body.latitude ? parseFloat(req.body.latitude) : undefined;
+    const deviceLng = req.body.longitude ? parseFloat(req.body.longitude) : undefined;
+
+    const result = await evidenceService.uploadEvidence(
+      id,
+      req.user!.id,
+      req.user!.role,
+      type,
+      req.file,
+      deviceLat,
+      deviceLng,
+    );
+
+    res.status(201).json({
+      evidence: result.evidence,
+      warning: result.geoWarning,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 
 // ...existing code...
 export async function list(req: Request, res: Response, next: NextFunction) {
@@ -123,10 +155,16 @@ export async function list(req: Request, res: Response, next: NextFunction) {
     const status = rawStatus && (Object.values(IssueStatus) as string[]).includes(rawStatus)
       ? (rawStatus as IssueStatus)
       : undefined;
+    // We use a broader logical OR in the service if assignedTo is provided
+    // so it matches officer, inspector, or contractor.
+    const assignedId = req.query.assignedTo as string | undefined;
+
     const result = await issueService.listIssues({
       wardId:       req.query.wardId       as string | undefined,
       status,
-      assignedToId: req.query.assignedTo   as string | undefined,
+      assignedToId: assignedId,
+      inspectorId:  assignedId,
+      contractorId: assignedId,
       createdById:  req.query.createdById  as string | undefined,
       projectId,
     });
