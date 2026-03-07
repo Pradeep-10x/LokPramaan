@@ -30,8 +30,11 @@ export interface LoginInput {
  * Register a new CITIZEN user.
  */
 export async function registerUser(input: RegisterInput) {
-  // Validate ward if provided
-    const emailVerified = await isEmailVerified(input.email as string);
+  if (!input.email) {
+    throw Object.assign(new Error('Email is required for registration'), { statusCode: 400 });
+  }
+
+  const emailVerified = await isEmailVerified(input.email);
   if (!emailVerified) {
     throw Object.assign(new Error("Email not verified. Please verify your email with OTP first."), {
       statusCode: 400,
@@ -76,7 +79,7 @@ export async function registerUser(input: RegisterInput) {
     select: { id: true, name: true, email: true, role: true, adminUnitId: true, createdAt: true },
   });
 
-  await cleanupUsedOtp(input.email as string);
+  await cleanupUsedOtp(input.email);
 
   // Audit log — user is the actor for their own registration
   await prisma.auditLog.create({

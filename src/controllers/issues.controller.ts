@@ -5,12 +5,13 @@ import { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import * as issueService from '../services/issue.service';
 import * as evidenceService from '../services/evidence.service';
-import { EvidenceType } from '../generated/prisma/client.js';
+import { EvidenceType, IssueStatus } from '../generated/prisma/client.js';
 import { prisma } from '../prisma/client';
 import { tryExtractPhotoLocation } from '../services/exif.service';
 import { getNearestWard } from '../services/adminUnit.service';
 import { haversineDistance } from '../utils/geo.util';
 import { config } from '../config/index.js';
+import { logger } from '../utils/logger.js';
 
 export const upload = multer({ storage: multer.memoryStorage() });
 
@@ -97,7 +98,7 @@ export async function create(req: Request, res: Response, next: NextFunction) {
         );
       } catch {
         // Photo storage failure must not block issue creation; log only
-        console.error('[create issue] Failed to store citizen photo for issue', result.id);
+        logger.error('[create issue] Failed to store citizen photo', { issueId: result.id });
       }
     }
 
@@ -118,9 +119,13 @@ export async function list(req: Request, res: Response, next: NextFunction) {
     const rawProjectId = req.params.projectId ?? req.query.projectId;
     const projectId = typeof rawProjectId === 'string' ? rawProjectId : undefined;
 
+    const rawStatus = req.query.status as string | undefined;
+    const status = rawStatus && (Object.values(IssueStatus) as string[]).includes(rawStatus)
+      ? (rawStatus as IssueStatus)
+      : undefined;
     const result = await issueService.listIssues({
       wardId:       req.query.wardId       as string | undefined,
-      status:       req.query.status       as any,
+      status,
       assignedToId: req.query.assignedTo   as string | undefined,
       createdById:  req.query.createdById  as string | undefined,
       projectId,
@@ -138,9 +143,13 @@ export async function list(req: Request, res: Response, next: NextFunction) {
  */
 export async function mine(req: Request, res: Response, next: NextFunction) {
   try {
+    const mineRawStatus = req.query.status as string | undefined;
+    const mineStatus = mineRawStatus && (Object.values(IssueStatus) as string[]).includes(mineRawStatus)
+      ? (mineRawStatus as IssueStatus)
+      : undefined;
     const result = await issueService.listIssues({
       createdById: req.user!.id,
-      status: req.query.status as any,
+      status: mineStatus,
     });
     res.json(result);
   } catch (err) {
@@ -161,9 +170,13 @@ export async function myWard(req: Request, res: Response, next: NextFunction) {
       });
       return;
     }
+    const wardRawStatus = req.query.status as string | undefined;
+    const wardStatus = wardRawStatus && (Object.values(IssueStatus) as string[]).includes(wardRawStatus)
+      ? (wardRawStatus as IssueStatus)
+      : undefined;
     const result = await issueService.listIssues({
       wardId: req.user!.adminUnitId,
-      status: req.query.status as any,
+      status: wardStatus,
     });
     res.json(result);
   } catch (err) {
@@ -229,6 +242,10 @@ export async function convert(req: Request, res: Response, next: NextFunction) {
 export async function assignInspector(req: Request, res: Response, next: NextFunction) {
   try {
     const id = req.params.id as string;
+    if (!req.body.inspectorId || typeof req.body.inspectorId !== 'string') {
+      res.status(400).json({ error: 'inspectorId is required and must be a string' });
+      return;
+    }
     const result = await issueService.assignInspector(id, req.user!.id, req.body.inspectorId);
     res.json(result);
   } catch (err) {
@@ -239,6 +256,10 @@ export async function assignInspector(req: Request, res: Response, next: NextFun
 export async function hireContractor(req: Request, res: Response, next: NextFunction) {
   try {
     const id = req.params.id as string;
+    if (!req.body.contractorId || typeof req.body.contractorId !== 'string') {
+      res.status(400).json({ error: 'contractorId is required and must be a string' });
+      return;
+    }
     const result = await issueService.hireContractor(id, req.user!.id, req.body.contractorId);
     res.json(result);
   } catch (err) {

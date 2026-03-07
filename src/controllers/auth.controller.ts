@@ -10,6 +10,11 @@ export async function register(req: Request, res: Response, next: NextFunction) 
   try {
     const { email } = req.body;
 
+    if (!email || typeof email !== 'string') {
+      res.status(400).json({ error: 'email is required' });
+      return;
+    }
+
     // Auto-check: if email isn't verified yet, send OTP and ask user to verify first
     const verified = await isEmailVerified(email);
     if (!verified) {

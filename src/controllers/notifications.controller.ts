@@ -8,7 +8,8 @@ import { prisma } from '../prisma/client.js';
 export async function notifyForIssue(req: Request, res: Response, next: NextFunction) {
   try {
     const id = req.params.id as string;
-    const radius = req.query.radius ? parseInt(req.query.radius as string, 10) : 50;
+    const parsedRadius = req.query.radius ? parseInt(req.query.radius as string, 10) : 50;
+    const radius = isNaN(parsedRadius) || parsedRadius <= 0 ? 50 : parsedRadius;
     const result = await notificationService.notifyNearbyResidents(
       id,
       req.user!.id,

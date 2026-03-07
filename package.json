@@ -9,9 +9,10 @@
     "start": "tsx src/server.ts",
     "build": "npx prisma generate",
     "seed": "tsx src/seed/seed.ts",
-    "test": "jest --forceExit --detectOpenHandles",
-    "test:unit": "jest --testPathPatterns=unit --forceExit",
-    "test:integration": "jest --testPathPatterns=integration --forceExit --detectOpenHandles",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run --testNamePattern=unit",
+    "test:integration": "vitest run src/api.integration.test.ts",
     "lint": "tsc --noEmit --skipLibCheck"
   },
   "keywords": [
@@ -60,6 +61,7 @@
     "ts-jest": "^29.4.6",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
   }
 }

@@ -4,13 +4,19 @@
 import { Request, Response, NextFunction } from 'express';
 import * as projectService from '../services/project.service';
 import { prisma } from '../prisma/client';
+import { ProjectStatus } from '../generated/prisma/client.js';
 
 export async function create(req: Request, res: Response, next: NextFunction) {
   try {
+    const adminUnitId = req.body.adminUnitId ?? req.user!.adminUnitId;
+    if (!adminUnitId) {
+      res.status(400).json({ error: 'adminUnitId is required' });
+      return;
+    }
     const result = await projectService.createProject(
       {
         ...req.body,
-        adminUnitId: req.body.adminUnitId ?? req.user!.adminUnitId,
+        adminUnitId,
       },
       req.user!.id,
     );
@@ -22,9 +28,13 @@ export async function create(req: Request, res: Response, next: NextFunction) {
 
 export async function list(req: Request, res: Response, next: NextFunction) {
   try {
+    const rawStatus = req.query.status as string | undefined;
+    const status = rawStatus && (Object.values(ProjectStatus) as string[]).includes(rawStatus)
+      ? (rawStatus as ProjectStatus)
+      : undefined;
     const result = await projectService.listProjects({
       adminUnitId: req.query.adminUnitId as string | undefined,
-      status: req.query.status as any,
+      status,
     });
     res.json(result);
   } catch (err) {
@@ -45,9 +55,13 @@ export async function myWard(req: Request, res: Response, next: NextFunction) {
       });
       return;
     }
+    const wardRawStatus = req.query.status as string | undefined;
+    const wardStatus = wardRawStatus && (Object.values(ProjectStatus) as string[]).includes(wardRawStatus)
+      ? (wardRawStatus as ProjectStatus)
+      : undefined;
     const result = await projectService.listProjects({
       adminUnitId: req.user!.adminUnitId,
-      status: req.query.status as any,
+      status: wardStatus,
     });
     res.json(result);
   } catch (err) {

@@ -57,6 +57,10 @@ export async function storeFile(
 
   if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
-  fs.writeFileSync(path.join(uploadDir, filename), buffer);
+  try {
+    fs.writeFileSync(path.join(uploadDir, filename), buffer);
+  } catch (err: any) {
+    throw new Error(`Failed to write file to disk: ${err.message}`);
+  }
   return `/uploads/${filename}`;
 }

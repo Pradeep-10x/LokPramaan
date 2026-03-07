@@ -9,7 +9,7 @@ import { IssueStatus, ProjectStatus, Role, EvidenceType } from '../generated/pri
 import { config } from '../config';
 import { notify, notifyWardOfficers } from './notification.service.js';
 import { haversineDistance } from '../utils/geo.util.js';
-import { classifyDepartment, type ClassificationResult } from './classification.service.js';
+import { classifyDepartment } from './classification.service.js';
 
 /** Issues within this radius (metres) are flagged as potential duplicates on creation. */
 const DUPLICATE_RADIUS_METRES = 100;
@@ -430,6 +430,12 @@ export async function assignIssue(issueId: string, actorId: string, input: Assig
   if (!assignee) {
     throw new AppError(400, 'INVALID_USER', 'Assignee not found');
   }
+  if (assignee.role !== Role.OFFICER && assignee.role !== Role.ADMIN) {
+    throw new AppError(400, 'INVALID_ROLE', 'Assignee must be an OFFICER or ADMIN');
+  }
+  if (assignee.adminUnitId !== issue.wardId) {
+    throw new AppError(403, 'WRONG_WARD', 'Assignee does not belong to the same ward as the issue');
+  }
 
   const slaHours = input.slaHours ?? config.slaDefaultHours;
   const slaDeadline = new Date(Date.now() + slaHours * 60 * 60 * 1000);
@@ -579,6 +585,8 @@ export async function assignInspector(issueId: string, actorId: string, inspecto
   const inspector = await prisma.user.findUnique({ where: { id: inspectorId } });
   if (!inspector || inspector.role !== Role.INSPECTOR)
     throw new AppError(400, 'INVALID_USER', 'User must have INSPECTOR role');
+  if (inspector.adminUnitId !== issue.wardId)
+    throw new AppError(403, 'WRONG_WARD', 'Inspector does not belong to the same ward as the issue');
 
   const [updated] = await prisma.$transaction([
     prisma.issue.update({
@@ -636,6 +644,8 @@ export async function hireContractor(issueId: string, actorId: string, contracto
   const contractor = await prisma.user.findUnique({ where: { id: contractorId } });
   if (!contractor || contractor.role !== Role.CONTRACTOR)
     throw new AppError(400, 'INVALID_USER', 'User must have CONTRACTOR role');
+  if (contractor.adminUnitId !== issue.wardId)
+    throw new AppError(403, 'WRONG_WARD', 'Contractor does not belong to the same ward as the issue');
 
   const [updated] = await prisma.$transaction([
     prisma.issue.update({

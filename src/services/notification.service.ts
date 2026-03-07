@@ -24,12 +24,21 @@ export async function importResidents(buffer: Buffer) {
       .update(row.phone + config.residentPhoneSalt)
       .digest('hex');
 
+    const latitude = parseFloat(row.latitude);
+    const longitude = parseFloat(row.longitude);
+    if (isNaN(latitude) || isNaN(longitude)) {
+      throw new AppError(
+        400,
+        'INVALID_COORDS',
+        `Invalid lat/lng for resident "${row.name || 'unknown'}": lat=${row.latitude}, lng=${row.longitude}`,
+      );
+    }
     const resident = await prisma.resident.create({
       data: {
         name: row.name || null,
         phoneHash,
-        latitude: parseFloat(row.latitude),
-        longitude: parseFloat(row.longitude),
+        latitude,
+        longitude,
       },
     });
     created.push(resident);
