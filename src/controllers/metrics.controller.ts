@@ -6,14 +6,19 @@ import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma/client';
 import { IssueStatus } from '../generated/prisma/client.js';
 
-export async function getMetrics(_req: Request, res: Response, next: NextFunction) {
+export async function getMetrics(req: Request, res: Response, next: NextFunction) {
   try {
-    const totalIssues = await prisma.issue.count();
-    const verifiedIssues = await prisma.issue.count({ where: { status: IssueStatus.VERIFIED } });
+    const rawWardId = req.query.wardId as string | undefined;
+    const baseWhere = rawWardId ? { wardId: rawWardId } : {};
+
+    const totalIssues = await prisma.issue.count({ where: baseWhere });
+    const verifiedIssues = await prisma.issue.count({ 
+      where: { ...baseWhere, status: IssueStatus.VERIFIED } 
+    });
 
     // Average resolution time: from ASSIGNED → VERIFIED
     const verifiedWithAssignment = await prisma.issue.findMany({
-      where: { status: IssueStatus.VERIFIED },
+      where: { ...baseWhere, status: IssueStatus.VERIFIED },
       select: { createdAt: true, updatedAt: true, slaDeadline: true },
     });
 
@@ -34,12 +39,12 @@ export async function getMetrics(_req: Request, res: Response, next: NextFunctio
 
     // Proof coverage: issues with both BEFORE and AFTER evidence
     const issuesWithBefore = await prisma.evidence.findMany({
-      where: { type: 'BEFORE' },
+      where: { type: 'BEFORE', issue: baseWhere },
       select: { issueId: true },
       distinct: ['issueId'],
     });
     const issuesWithAfter = await prisma.evidence.findMany({
-      where: { type: 'AFTER' },
+      where: { type: 'AFTER', issue: baseWhere },
       select: { issueId: true },
       distinct: ['issueId'],
     });
@@ -60,7 +65,7 @@ export async function getMetrics(_req: Request, res: Response, next: NextFunctio
       proof_coverage_percent:
         totalIssues > 0 ? Math.round((bothCount / totalIssues) * 10000) / 100 : 0,
     });
-} catch (err) {
+  } catch (err) {
     next(err);
   }
 }
