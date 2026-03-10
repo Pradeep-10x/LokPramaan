@@ -1,346 +1,174 @@
-# WitnessLedger Backend
+JanPramaan Backend
 
-**Ward-scoped public-works transparency engine** — a Node.js + Express + Prisma backend for civic issue tracking with tamper-evident proof, geotagged evidence, SLA enforcement, and inspector verification.
+JanPramaan is a transparent public service CRM and civic accountability platform that transforms citizen complaints into verifiable, trackable government actions.
 
----
+The system enables citizens to report civic issues (roads, water leaks, streetlights, sanitation, etc.), automatically routes them to responsible government officers, and ensures tamper-proof verification of completed work through geo-tagged evidence and inspector validation.
 
-## Tech Stack
+By combining workflow automation, geospatial routing, cryptographic evidence verification, and transparent audit trails, JanPramaan ensures that every complaint results in accountable public action rather than disappearing into bureaucratic systems.
 
-- **Runtime**: Node.js ≥ 18, TypeScript
-- **Framework**: Express 5
-- **ORM**: Prisma (PostgreSQL 15+)
-- **Auth**: bcrypt + JWT
-- **File Handling**: Multer (memory storage → disk)
-- **Hashing**: SHA-256 (crypto), Merkle trees
-- **EXIF**: exifr
-- **Testing**: Jest + Supertest
-- **Logging**: Winston
-- **QR Codes**: qrcode
+Problem Addressed
 
----
+Municipal and public service departments receive thousands of complaints daily across domains such as:
 
-## Setup
+Road maintenance
 
-### 1. Prerequisites
+Water supply
 
-- **Node.js** ≥ 18
-- **PostgreSQL** ≥ 15 running locally or remotely
+Sanitation
 
-### 2. Clone & Install
+Electricity infrastructure
 
-```bash
-cd witnessledger-backend
-npm install
-```
+Public lighting
 
-### 3. Configure Environment
+Drainage systems
 
-```bash
-cp .env.example .env
-```
+However, existing grievance platforms suffer from major gaps:
 
-Edit `.env` and set your `DATABASE_URL`:
+No centralized task routing — complaints are manually forwarded between departments
 
-```
-DATABASE_URL=postgresql://user:pass@localhost:5432/witnessledger_dev
-JWT_SECRET=change_me_in_production
-```
+Lack of accountability — officers can close issues without proof
 
-### 4. Create Database
+No real-time tracking — citizens cannot verify progress
 
-```bash
-createdb witnessledger_dev
-# Or via psql:
-# psql -c "CREATE DATABASE witnessledger_dev;"
-```
+Evidence manipulation risk — uploaded proof can be modified
 
-### 5. Run Migrations
+No transparent audit trail — historical actions are not publicly verifiable
 
-```bash
-npx prisma migrate dev --name init
-```
+JanPramaan addresses these challenges by introducing a verifiable civic workflow engine where every complaint becomes a traceable, evidence-backed government action.
 
-This generates the Prisma client and applies the schema.
+Core System Concept
 
-### 6. Seed the Database
+JanPramaan converts a complaint into a structured governance workflow:
 
-```bash
-npx prisma db seed
-# or
-npm run seed
-```
+Citizen Complaint
+        ↓
+Automatic Department Routing
+        ↓
+Officer Assignment
+        ↓
+Inspector Captures Geo-Tagged Evidence
+        ↓
+Contractor Executes Work
+        ↓
+Inspector Uploads After-Evidence
+        ↓
+Officer Verifies Completion
+        ↓
+Public Proof + QR Transparency
 
-The seed script creates:
+Each step is recorded in a tamper-evident audit log, ensuring full transparency.
 
-- **Admin Units**: India (GLOBAL) → Lucknow (CITY) → Ward 12/13/14 (WARD)
-- **Users**: Admin, Inspector, City Officer, Ward Officers (12/13/14)
-- **Issues**: 2 sample issues (Ward 12 & Ward 13)
-- **Project**: 1 active drainage project
-- **Residents**: 10 from CSV
+Key Innovations
+Tamper-Proof Evidence System
 
-Credentials printed to console:
+Before and after images are hashed using SHA-256 cryptographic hashing and linked through a Merkle root, ensuring uploaded evidence cannot be altered.
 
-| Role      | Email                  | Password          |
-| --------- | ---------------------- | ----------------- |
-| ADMIN     | admin@demo.local       | AdminPass123!     |
-| OFFICER   | cityofficer@demo.local | OfficerPass123!   |
-| INSPECTOR | inspector@demo.local   | InspectorPass123! |
-| OFFICER   | officer12@demo.local   | OfficerPass123!   |
-| OFFICER   | officer13@demo.local   | OfficerPass123!   |
-| OFFICER   | officer14@demo.local   | OfficerPass123!   |
+Inspector-Based Verification
 
-### 7. Run the Server
+Issues cannot be closed by a single officer.
+Completion requires independent inspector verification, preventing fraudulent closures.
 
-```bash
-npm run dev    # Development (hot reload via tsx)
-npm start      # Production
-```
+Geo-Aware Complaint Routing
 
-Server starts at `http://localhost:4000`.
+Using PostGIS spatial queries, complaints are automatically mapped to the correct ward and department jurisdiction.
 
-### 8. Verify
+Transparent Public Proof
 
-```bash
-curl http://localhost:4000/health
-# → {"ok":true,"db":true,"timestamp":"..."}
-```
+Every resolved issue generates a public proof page and QR code containing:
 
----
+Geo-location of issue
 
-## Running Tests
+Evidence images
 
-```bash
-# All tests (requires test DB)
-npm test
+Timeline of actions
 
-# Unit tests only (no DB needed)
-npm run test:unit
+Responsible department
 
-# Integration tests only
-npm run test:integration
-```
+Verification record
 
-> **Test DB**: Set `DATABASE_URL` to a separate test database to avoid clobbering dev data.
-> The integration test creates and cleans up its own data.
+SLA Enforcement
 
----
+Each complaint has a configurable resolution deadline.
+If officers fail to respond in time, the system automatically flags delays.
 
-## API Reference
+Tech Stack
+Layer	Technology	Purpose
+Runtime	Node.js	Backend runtime
+Framework	Express.js	API routing and service orchestration
+Database	PostgreSQL + PostGIS	Geospatial complaint routing
+ORM	Prisma	Type-safe database queries
+Authentication	JWT + bcrypt	Secure user authentication
+Evidence Processing	Multer + EXIF	Image uploads and GPS metadata extraction
+Security	SHA-256 hashing	Tamper-proof evidence verification
+Audit System	Merkle Trees	Immutable action verification
+Notifications	Twilio SMS / Web Push	Citizen alerts
+Storage	AWS S3 / Cloudinary	Evidence storage
+QR System	qrcode	Public transparency pages
+Core Modules
+Complaint Management
 
-### Auth
+Handles complaint creation, categorization, and routing.
 
-| Method | Endpoint             | Auth | Body                                  |
-| ------ | -------------------- | ---- | ------------------------------------- |
-| POST   | `/api/auth/register` | No   | `{name, email?, password, wardId?}`   |
-| POST   | `/api/auth/login`    | No   | `{email, password}` → `{token, user}` |
+Workflow Engine
 
-### Admin Units
+Automates officer assignment and issue lifecycle management.
 
-| Method | Endpoint                        | Auth  | Notes                    |
-| ------ | ------------------------------- | ----- | ------------------------ |
-| GET    | `/api/admin-units`              | No    | List all (filter: ?type) |
-| POST   | `/api/admin-units`              | ADMIN | Create city/ward         |
-| GET    | `/api/admin-units/:id/children` | No    | Get child units          |
+Evidence Verification System
 
-### Users
+Processes uploaded images, extracts GPS metadata, and generates tamper-proof hashes.
 
-| Method | Endpoint        | Auth  | Notes                          |
-| ------ | --------------- | ----- | ------------------------------ |
-| POST   | `/api/users`    | ADMIN | Create officer/inspector/admin |
-| GET    | `/api/users/me` | Auth  | Current user profile           |
+Inspector Verification Module
 
-### Projects
+Allows field inspectors to validate completed work.
 
-| Method | Endpoint                     | Auth  | Notes                              |
-| ------ | ---------------------------- | ----- | ---------------------------------- |
-| POST   | `/api/projects`              | ADMIN | Create project                     |
-| GET    | `/api/projects`              | No    | List (filter: adminUnitId, status) |
-| GET    | `/api/projects/:id`          | No    | Project details                    |
-| POST   | `/api/projects/:id/approve`  | ADMIN | Approve PROPOSED → ACTIVE          |
-| GET    | `/api/projects/:id/timeline` | No    | Audit log entries                  |
+Transparency Dashboard
 
-### Issues
-
-| Method | Endpoint                           | Auth           | Notes                                     |
-| ------ | ---------------------------------- | -------------- | ----------------------------------------- |
-| POST   | `/api/issues`                      | Auth           | Create issue (auto-assigns)               |
-| GET    | `/api/issues`                      | No             | List (filter: wardId, status, assignedTo) |
-| GET    | `/api/issues/:id`                  | No             | Issue details + evidence                  |
-| POST   | `/api/issues/:id/assign`           | OFFICER, ADMIN | Assign/reassign                           |
-| POST   | `/api/issues/:id/convert`          | OFFICER        | Convert to project (atomic)               |
-| POST   | `/api/issues/:id/toggle-duplicate` | OFFICER, ADMIN | Mark/unmark duplicate                     |
-| GET    | `/api/issues/:id/timeline`         | No             | Audit log entries                         |
-
-### Evidence
-
-| Method | Endpoint                   | Auth | Notes                                          |
-| ------ | -------------------------- | ---- | ---------------------------------------------- |
-| POST   | `/api/issues/:id/evidence` | Auth | Multipart file + `?type=BEFORE/AFTER/DOCUMENT` |
-| GET    | `/api/issues/:id/evidence` | No   | List evidence for issue                        |
-
-### Verification
-
-| Method | Endpoint                 | Auth      | Body                                         |
-| ------ | ------------------------ | --------- | -------------------------------------------- |
-| POST   | `/api/issues/:id/verify` | INSPECTOR | `{verdict: "APPROVED"/"REJECTED", remarks?}` |
-
-### Proof & QR
+Generates public verification records and governance metrics.
 
-| Method | Endpoint                | Auth | Notes                        |
-| ------ | ----------------------- | ---- | ---------------------------- |
-| GET    | `/api/issues/:id/proof` | No   | Public proof bundle + merkle |
-| GET    | `/api/issues/:id/qr`    | No   | QR code data URL             |
+Example Civic Workflow
 
-### Residents & Notifications
+Citizen reports a broken water pipe via mobile app.
 
-| Method | Endpoint                | Auth           | Notes                   |
-| ------ | ----------------------- | -------------- | ----------------------- |
-| POST   | `/api/residents/import` | ADMIN          | Upload CSV (multipart)  |
-| GET    | `/api/notify/issue/:id` | ADMIN, OFFICER | Notify nearby residents |
+System identifies the correct ward using geospatial routing.
 
-### Metrics & Health
+Complaint is assigned to the responsible officer.
 
-| Method | Endpoint       | Auth | Notes                      |
-| ------ | -------------- | ---- | -------------------------- |
-| GET    | `/api/metrics` | No   | KPIs (verified%, SLA, etc) |
-| GET    | `/health`      | No   | `{ok, db, timestamp}`      |
+Inspector captures before evidence.
 
----
+Contractor performs repair work.
 
-## Demo cURL Workflow
+Inspector uploads after evidence.
 
-```bash
-BASE=http://localhost:4000
+Officer verifies completion.
 
-# 1. Login as admin
-TOKEN=$(curl -s -X POST $BASE/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@demo.local","password":"AdminPass123!"}' \
-  | jq -r '.token')
-echo "Admin token: $TOKEN"
+System generates public proof page and QR transparency record.
 
-# 2. Get admin units (find ward IDs)
-curl -s $BASE/api/admin-units | jq .
+Architecture Overview
+Citizen App (Flutter)
+        ↓
+API Gateway (Node.js + Express)
+        ↓
+AI Classification Engine
+        ↓
+Complaint Workflow Engine
+        ↓
+Geospatial Routing (PostGIS)
+        ↓
+Evidence Processing Layer
+        ↓
+Inspector Verification
+        ↓
+Public Proof + Notification System
+Why JanPramaan Matters
 
-# 3. Register a citizen
-CIT=$(curl -s -X POST $BASE/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Demo Citizen","email":"citizen@demo.local","password":"CitizenPass123!"}' \
-  | jq -r '.token')
-echo "Citizen token: $CIT"
+JanPramaan transforms public grievance systems from passive complaint portals into active accountability platforms.
 
-# 4. Create an issue (as citizen) — replace WARD_ID with actual Ward 12 ID
-WARD_ID=$(curl -s $BASE/api/admin-units | jq -r '.[] | select(.name=="Ward 12") | .id')
-ISSUE=$(curl -s -X POST $BASE/api/issues \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $CIT" \
-  -d "{\"title\":\"Broken pipe on Kanpur Road\",\"description\":\"Water leaking from main pipe\",\"latitude\":26.8467,\"longitude\":80.9462,\"wardId\":\"$WARD_ID\"}")
-ISSUE_ID=$(echo $ISSUE | jq -r '.id')
-echo "Issue ID: $ISSUE_ID"
+The platform ensures:
 
-# 5. Upload BEFORE evidence (as citizen)
-curl -s -X POST "$BASE/api/issues/$ISSUE_ID/evidence?type=BEFORE" \
-  -H "Authorization: Bearer $CIT" \
-  -F "file=@/path/to/before-photo.jpg" | jq .
+Transparency in public works
 
-# 6. Login as officer
-OFF_TOKEN=$(curl -s -X POST $BASE/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"officer12@demo.local","password":"OfficerPass123!"}' \
-  | jq -r '.token')
+Accountability for government officers
 
-# 7. Assign issue (re-assign with custom SLA)
-OFFICER_ID=$(curl -s $BASE/api/users/me -H "Authorization: Bearer $OFF_TOKEN" | jq -r '.id')
-curl -s -X POST "$BASE/api/issues/$ISSUE_ID/assign" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $OFF_TOKEN" \
-  -d "{\"assignedToId\":\"$OFFICER_ID\",\"slaHours\":24}" | jq .
+Trust between citizens and institutions
 
-# 8. Upload AFTER evidence (as officer)
-curl -s -X POST "$BASE/api/issues/$ISSUE_ID/evidence?type=AFTER" \
-  -H "Authorization: Bearer $OFF_TOKEN" \
-  -F "file=@/path/to/after-photo.jpg" | jq .
-
-# 9. Login as inspector & verify
-INS_TOKEN=$(curl -s -X POST $BASE/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"inspector@demo.local","password":"InspectorPass123!"}' \
-  | jq -r '.token')
-
-curl -s -X POST "$BASE/api/issues/$ISSUE_ID/verify" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $INS_TOKEN" \
-  -d '{"verdict":"APPROVED","remarks":"Work verified on-site"}' | jq .
-
-# 10. Get public proof
-curl -s "$BASE/api/issues/$ISSUE_ID/proof" | jq .
-
-# 11. Get QR code
-curl -s "$BASE/api/issues/$ISSUE_ID/qr" | jq .
-
-# 12. View metrics
-curl -s $BASE/api/metrics | jq .
-
-# 13. View timeline
-curl -s "$BASE/api/issues/$ISSUE_ID/timeline" | jq .
-```
-
----
-
-## Optional: PostGIS
-
-For radius-based queries using database-level geometry:
-
-```sql
--- Enable PostGIS
-CREATE EXTENSION IF NOT EXISTS postgis;
-
--- Add geometry columns
-ALTER TABLE "Issue" ADD COLUMN geom geometry(Point, 4326);
-ALTER TABLE "Resident" ADD COLUMN geom geometry(Point, 4326);
-
--- Create spatial indices
-CREATE INDEX idx_issue_geom ON "Issue" USING GIST (geom);
-CREATE INDEX idx_resident_geom ON "Resident" USING GIST (geom);
-
--- Populate from existing lat/lon
-UPDATE "Issue" SET geom = ST_SetSRID(ST_MakePoint(longitude, latitude), 4326);
-UPDATE "Resident" SET geom = ST_SetSRID(ST_MakePoint(longitude, latitude), 4326);
-```
-
-Without PostGIS, the app uses in-memory haversine filtering.
-
-## Optional: Twilio
-
-Set these in `.env` to enable real SMS notifications:
-
-```
-TWILIO_SID=your_account_sid
-TWILIO_TOKEN=your_auth_token
-TWILIO_FROM=+1234567890
-```
-
-Without Twilio, notifications are simulated and logged.
-
----
-
-## Architecture
-
-```
-src/
-├── app.ts              # Express app setup & route mounting
-├── server.ts           # HTTP server entry point
-├── config/             # Environment configuration
-├── prisma/             # Prisma client singleton
-├── routes/             # Route definitions (10 modules)
-├── controllers/        # Request handlers (11 modules)
-├── services/           # Business logic (9 modules)
-├── middleware/          # Auth, RBAC, validation, error
-├── utils/              # Hash, Merkle, EXIF, geo, CSV
-├── seed/               # Seed script & sample data
-└── tests/              # Unit & integration tests
-```
-
-## License
-
-ISC
+By making every civic action verifiable and publicly auditable, JanPramaan strengthens digital governance and enables data-driven public service delivery.
