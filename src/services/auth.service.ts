@@ -34,13 +34,6 @@ export async function registerUser(input: RegisterInput) {
     throw Object.assign(new Error('Email is required for registration'), { statusCode: 400 });
   }
 
-  const emailVerified = await isEmailVerified(input.email);
-  if (!emailVerified) {
-    throw Object.assign(new Error("Email not verified. Please verify your email with OTP first."), {
-      statusCode: 400,
-    });
-  }
-
   // Resolve adminUnitId: manual wardId > device GPS auto-detect > null
   let resolvedWardId: string | undefined = undefined;
 
@@ -57,11 +50,16 @@ export async function registerUser(input: RegisterInput) {
     resolvedWardId = nearest.wardId;
   }
 
-  // Check email uniqueness (if provided)
+  // Check email uniqueness
   if (input.email) {
     const existing = await prisma.user.findUnique({ where: { email: input.email } });
     if (existing) {
-      throw new AppError(409, 'EMAIL_EXISTS', 'A user with that email already exists');
+      if (existing.isEmailVerified) {
+         throw new AppError(409, 'EMAIL_EXISTS', 'A user with that email already exists');
+      } else {
+         // Overwrite unverified user
+         await prisma.user.delete({ where: { email: input.email } });
+      }
     }
   }
 
@@ -75,24 +73,21 @@ export async function registerUser(input: RegisterInput) {
       passwordHash,
       role: Role.CITIZEN,
       adminUnitId: resolvedWardId ?? null,
+      isEmailVerified: false,
     },
     select: { id: true, name: true, email: true, role: true, adminUnitId: true, createdAt: true },
   });
-
-  await cleanupUsedOtp(input.email);
 
   // Audit log — user is the actor for their own registration
   await prisma.auditLog.create({
     data: {
       actorId: user.id,
-      action: 'USER_REGISTERED',
+      action: 'USER_REGISTERED_UNVERIFIED',
       metadata: { email: user.email, wardId: resolvedWardId ?? null },
     },
   });
 
-  const token = jwt.sign({ userId: user.id, role: user.role }, config.jwtSecret, { expiresIn: '24h' });
-
-  return { token, user };
+  return { user };
 }
 
 /**
@@ -109,6 +104,10 @@ export async function loginUser(input: LoginInput) {
     throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
   }
 
+  if (!user.isEmailVerified) {
+    throw new AppError(403, 'UNVERIFIED_EMAIL', 'Please verify your email address to log in');
+  }
+
   const token = jwt.sign({ userId: user.id, role: user.role }, config.jwtSecret, { expiresIn: '24h' });
 
   // Audit log
@@ -116,6 +115,41 @@ export async function loginUser(input: LoginInput) {
     data: {
       actorId: user.id,
       action: 'USER_LOGIN',
+      metadata: { email: user.email },
+    },
+  });
+
+  return {
+    token,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      adminUnitId: user.adminUnitId,
+    },
+  };
+}
+
+/**
+ * Marks user as verified and logs them in.
+ */
+export async function verifyAndLoginUser(email: string) {
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) throw new AppError(404, 'NOT_FOUND', 'User not found');
+  
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { isEmailVerified: true }
+  });
+
+  const token = jwt.sign({ userId: user.id, role: user.role }, config.jwtSecret, { expiresIn: '24h' });
+
+  // Audit log
+  await prisma.auditLog.create({
+    data: {
+      actorId: user.id,
+      action: 'USER_VERIFIED',
       metadata: { email: user.email },
     },
   });

@@ -88,15 +88,20 @@ export async function uploadEvidence(
     }
   }
 
-  // Determine coordinates: use EXIF if available, else flag as geoFallback
+  // Determine coordinates: use EXIF if available, else fallback to mandatory device GPS and flag as geoFallback
   let evidenceLat = exif.latitude;
   let evidenceLon = exif.longitude;
   let geoFallback = false;
 
   if (evidenceLat === null || evidenceLon === null) {
     geoFallback = true;
-    evidenceLat = null;
-    evidenceLon = null;
+    if (deviceLat !== undefined && deviceLng !== undefined) {
+      evidenceLat = deviceLat;
+      evidenceLon = deviceLng;
+    } else {
+      evidenceLat = null;
+      evidenceLon = null;
+    }
   }
 
   // ── Device GPS vs EXIF GPS check (hard reject) ─────────────────────────

@@ -15,32 +15,29 @@ export async function register(req: Request, res: Response, next: NextFunction) 
       return;
     }
 
-    // Auto-check: if email isn't verified yet, send OTP and ask user to verify first
-    const verified = await isEmailVerified(email);
-    if (!verified) {
-      try {
-        await sendOtp(email);
-      } catch (e: any) {
-        // If rate-limited, still tell them to verify
-        if (e.statusCode === 429) {
-          res.status(429).json({
-            error: e.message,
-            step: "verify_email",
-            message: "OTP already sent. Please verify your email using POST /api/otp/verify",
-          });
-          return;
-        }
-        throw e;
+    // 1. Create the unverified user in the database
+    const { user } = await authService.registerUser(req.body);
+
+    // 2. Send OTP
+    try {
+      await sendOtp(email);
+    } catch (e: any) {
+      if (e.statusCode === 429) {
+        res.status(429).json({
+          error: e.message,
+          step: "verify_email",
+          message: "OTP already sent. Please verify your email using POST /api/otp/verify",
+        });
+        return;
       }
-      res.status(202).json({
-        step: "verify_email",
-        message: "OTP sent to your email. Verify it first using POST /api/otp/verify, then call register again.",
-      });
-      return;
+      throw e;
     }
 
-    const result = await authService.registerUser(req.body);
-    res.status(201).json(result);
+    res.status(202).json({
+      step: "verify_email",
+      message: "Registration accepted. OTP sent to your email. Please verify using POST /api/otp/verify to complete the process.",
+      user
+    });
   } catch (err: any) {
     if (err.statusCode === 400) {
       res.status(400).json({ error: err.message });

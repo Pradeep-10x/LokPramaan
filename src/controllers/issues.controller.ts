@@ -122,8 +122,16 @@ export async function uploadEvidence(req: Request, res: Response, next: NextFunc
       return;
     }
 
-    const deviceLat = req.body.latitude ? parseFloat(req.body.latitude) : undefined;
-    const deviceLng = req.body.longitude ? parseFloat(req.body.longitude) : undefined;
+    const deviceLat = parseFloat(req.body.latitude);
+    const deviceLng = parseFloat(req.body.longitude);
+
+    if (isNaN(deviceLat) || isNaN(deviceLng)) {
+      res.status(400).json({
+        error: 'LOCATION_REQUIRED',
+        message: 'Live device latitude and longitude are mandatory for evidence upload.',
+      });
+      return;
+    }
 
     const result = await evidenceService.uploadEvidence(
       id,
