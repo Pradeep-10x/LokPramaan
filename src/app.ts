@@ -81,6 +81,9 @@ app.use('/api/notify', notificationsRoutes);
 app.use('/api/metrics', metricsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 
+import { setupSwagger } from './swagger.js';
+setupSwagger(app);
+
 // ─── Global error handler ─────────────────────────────────
 app.use(errorMiddleware);
 

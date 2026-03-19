@@ -11,6 +11,27 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 const router = Router();
 
+/**
+ * @openapi
+ * /api/residents/import:
+ *   post:
+ *     summary: Import residents from a CSV file
+ *     tags: [Residents]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Import succeeded. **Required Roles:** ADMIN
+ */
 router.post('/import', authMiddleware, requireRole('ADMIN'), upload.single('file'), residentsCtrl.importResidents);
 
 export default router;
