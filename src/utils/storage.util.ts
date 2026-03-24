@@ -7,31 +7,27 @@ import { v2 as cloudinary } from 'cloudinary';
 import path from 'path';
 import fs from 'fs';
 import { config } from '../config';
+import dotenv from 'dotenv';
 
-const isCloudinaryConfigured = !!(
-  process.env.CLOUDINARY_CLOUD_NAME &&
-  process.env.CLOUDINARY_API_KEY &&
-  process.env.CLOUDINARY_API_SECRET
-);
+dotenv.config();
 
-if (isCloudinaryConfigured) {
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key:    process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-  });
-}
-
-/**
- * Upload a file buffer to Cloudinary (production) or local disk (dev fallback).
- * Returns the public URL of the stored file.
- */
 export async function storeFile(
   buffer: Buffer,
   originalName: string,
   folder: string = 'evidence',
 ): Promise<string> {
+  const isCloudinaryConfigured = !!(
+    process.env.CLOUDINARY_CLOUD_NAME &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_SECRET
+  );
+
   if (isCloudinaryConfigured) {
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key:    process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
     // Upload to Cloudinary via upload_stream with long-term retention
     return new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
