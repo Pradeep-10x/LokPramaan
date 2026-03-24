@@ -16,10 +16,10 @@ export async function sendOtpEmail(email: string, otp: string): Promise<void> {
   await transporter.sendMail({
     from: process.env.SMTP_FROM || process.env.SMTP_USER,
     to: email,
-    subject: "LokPramaan — Verify your email",
+    subject: "JanPramaan — Verify your email",
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:24px;border:1px solid #e0e0e0;border-radius:8px;">
-        <h2 style="color:#1a73e8;">LokPramaan</h2>
+        <h2 style="color:#1a73e8;">JanPramaan</h2>
         <p>Your verification code is:</p>
         <h1 style="letter-spacing:8px;text-align:center;color:#333;">${otp}</h1>
         <p style="color:#666;font-size:14px;">This code expires in <strong>10 minutes</strong>.</p>
