@@ -50,3 +50,15 @@ export async function list(req: Request, res: Response, next: NextFunction) {
     next(err);
   }
 }
+
+export async function reject(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = req.params.id as string;
+    const evidenceId = req.params.evidenceId as string;
+    const reason = req.body.reason as string;
+    const result = await evidenceService.rejectEvidence(id, evidenceId, req.user!.id, reason || '');
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}

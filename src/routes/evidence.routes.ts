@@ -60,4 +60,37 @@ router.post('/:id/evidence', authMiddleware, requireRole('INSPECTOR', 'OFFICER',
  */
 router.get('/:id/evidence', evidenceCtrl.list);
 
+/**
+ * @openapi
+ * /api/issues/{id}/evidence/{evidenceId}/reject:
+ *   post:
+ *     summary: Reject uploaded evidence (asks for re-upload)
+ *     tags: [Evidence]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: evidenceId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Evidence rejected and deleted
+ */
+router.post('/:id/evidence/:evidenceId/reject', authMiddleware, requireRole('OFFICER', 'ADMIN'), evidenceCtrl.reject);
+
 export default router;

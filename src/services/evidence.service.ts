@@ -186,6 +186,16 @@ export async function uploadEvidence(
     },
   });
 
+  if (type === EvidenceType.BEFORE) {
+    // Notify ward officers to review and assign contractor
+    await notifyWardOfficers(
+      issue.wardId,
+      'BEFORE Photo Uploaded 📸',
+      `Inspector has submitted a BEFORE photo for "${issue.title}". Please review and hire a contractor.`,
+      { issueId },
+    );
+  }
+
   // AFTER photo uploaded → automatically move issue to UNDER_REVIEW
   if (type === EvidenceType.AFTER) {
     await prisma.issue.update({
@@ -233,4 +243,52 @@ export async function listEvidence(issueId: string) {
     include: { uploadedBy: { select: { id: true, name: true } } },
     orderBy: { uploadedAt: 'asc' },
   });
+}
+
+/**
+ * Reject a piece of evidence. This deletes the evidence record and
+ * notifies the inspector to upload again.
+ */
+export async function rejectEvidence(
+  issueId: string,
+  evidenceId: string,
+  actorId: string,
+  reason: string
+) {
+  const issue = await prisma.issue.findUnique({ where: { id: issueId } });
+  if (!issue) {
+    throw new AppError(404, 'NOT_FOUND', 'Issue not found');
+  }
+
+  const evidence = await prisma.evidence.findUnique({ where: { id: evidenceId } });
+  if (!evidence) {
+    throw new AppError(404, 'NOT_FOUND', 'Evidence not found');
+  }
+
+  if (evidence.issueId !== issueId) {
+    throw new AppError(400, 'MISMATCH', 'Evidence does not belong to this issue');
+  }
+
+  // Delete the evidence so the inspector can re-upload
+  await prisma.evidence.delete({ where: { id: evidenceId } });
+
+  // Audit log
+  await prisma.auditLog.create({
+    data: {
+      issueId,
+      actorId,
+      action: `EVIDENCE_REJECTED_${evidence.type}`,
+      metadata: { evidenceId, reason, fileUrl: evidence.fileUrl },
+    },
+  });
+
+  // Notify the person who uploaded it (the inspector)
+  await notify(
+    evidence.uploadedById,
+    `${evidence.type} Photo Rejected ❌`,
+    `Your uploaded ${evidence.type} photo for "${issue.title}" was rejected. Reason: ${reason || 'Not specified'}. Please upload a clear/valid photo.`,
+    { issueId }
+  );
+
+  return { success: true, message: 'Evidence rejected and deleted. Inspector notified.' };
 }
