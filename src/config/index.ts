@@ -30,7 +30,7 @@ export const config = {
    * are rejected to prevent re-use of archive/stock images.
    * Default: 6 hours.
    */
-  photoMaxAgeHours: parseInt(process.env.PHOTO_MAX_AGE_HOURS || '6', 10),
+  photoMaxAgeHours: parseInt(process.env.PHOTO_MAX_AGE_HOURS || '24', 10),
 
   /**
    * Maximum distance (metres) between device GPS and photo EXIF GPS.

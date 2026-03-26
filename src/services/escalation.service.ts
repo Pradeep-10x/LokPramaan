@@ -2,27 +2,27 @@
  * JanPramaan — Escalation service
  *
  * Runs as a background job. Scans for stalled issues and notifies
- * admins + relevant parties so nothing falls through the cracks.
+ * specific parties so nothing falls through the cracks.
  *
  * Three checks on every run:
- *  1. OPEN > 48 h with no officer action          → notify all ADMINs
- *  2. SLA deadline breached, not yet resolved      → notify all ADMINs
- *  3. WORK_DONE > 24 h (inspector hasn't sent AFTER photo) → nudge inspector
+ *  1. OPEN > 48 h with no officer action          → notify ADMINs + assigned officer
+ *  2. SLA deadline breached, not yet resolved      → notify ADMINs + concerned officer + citizen
+ *  3. INSPECTING_WORK > 48 h (inspector hasn't sent AFTER photo) → notify concerned officer + inspector
  */
 import { prisma } from '../prisma/client';
-import { IssueStatus } from '../generated/prisma/client.js';
-import { notify, notifyWardStaff } from './notification.service.js';
+import { IssueStatus, Role } from '../generated/prisma/client.js';
+import { notify } from './notification.service.js';
 import { logger } from '../app.js';
 
-const OPEN_ESCALATION_HOURS      = 48;
-const WORK_DONE_ESCALATION_HOURS = 24;
+const OPEN_ESCALATION_HOURS             = 48;
+const INSPECTING_WORK_ESCALATION_HOURS  = 48;
 
 export async function runEscalationCheck(): Promise<{ escalated: number }> {
   logger.info('[Escalation] Starting check…');
   const now  = new Date();
   let   total = 0;
 
-  // ── 1. OPEN too long ─────────────────────────────────────────────────────
+  // ── 1. OPEN too long → notify ADMINs + assigned officer ──────────────────
   const openCutoff = new Date(now.getTime() - OPEN_ESCALATION_HOURS * 3_600_000);
 
   const staleOpen = await prisma.issue.findMany({
@@ -36,12 +36,26 @@ export async function runEscalationCheck(): Promise<{ escalated: number }> {
 
   if (staleOpen.length) {
     for (const issue of staleOpen) {
-      await notifyWardStaff(
-        issue.wardId,
-        '⚠️ Issue Not Picked Up',
-        `"${issue.title}" in ${issue.ward.name} has been OPEN for over ${OPEN_ESCALATION_HOURS}h with no action.`,
-        { issueId: issue.id },
-      );
+      const admins = await prisma.user.findMany({
+        where: { adminUnitId: issue.wardId, role: Role.ADMIN },
+        select: { id: true },
+      });
+      for (const admin of admins) {
+        await notify(
+          admin.id,
+          '⚠️ Issue Not Picked Up',
+          `"${issue.title}" in ${issue.ward.name} has been OPEN for over ${OPEN_ESCALATION_HOURS}h with no action.`,
+          { issueId: issue.id },
+        );
+      }
+      if (issue.assignedToId) {
+        await notify(
+          issue.assignedToId,
+          '⚠️ Pending Issue Requires Action',
+          `"${issue.title}" assigned to you has been OPEN for over ${OPEN_ESCALATION_HOURS}h. Please accept or reject it.`,
+          { issueId: issue.id },
+        );
+      }
       await prisma.issue.update({ where: { id: issue.id }, data: { escalatedAt: now } });
       await prisma.auditLog.create({
         data: {
@@ -56,7 +70,7 @@ export async function runEscalationCheck(): Promise<{ escalated: number }> {
     logger.info(`[Escalation] ${staleOpen.length} OPEN-too-long issue(s) escalated.`);
   }
 
-  // ── 2. SLA breached ──────────────────────────────────────────────────────
+  // ── 2. SLA breached → notify ADMINs + concerned officer + citizen ────────
   const slaBreached = await prisma.issue.findMany({
     where: {
       slaDeadline: { lt: now, not: null },
@@ -74,13 +88,26 @@ export async function runEscalationCheck(): Promise<{ escalated: number }> {
 
   if (slaBreached.length) {
     for (const issue of slaBreached) {
-      await notifyWardStaff(
-        issue.wardId,
-        '🚨 SLA Breached',
-        `"${issue.title}" in ${issue.ward.name} has exceeded its SLA deadline and is still ${issue.status}.`,
-        { issueId: issue.id },
-      );
-      // Also notify the citizen
+      const admins = await prisma.user.findMany({
+        where: { adminUnitId: issue.wardId, role: Role.ADMIN },
+        select: { id: true },
+      });
+      for (const admin of admins) {
+        await notify(
+          admin.id,
+          '🚨 SLA Breached',
+          `"${issue.title}" in ${issue.ward.name} has exceeded its SLA deadline and is still ${issue.status}.`,
+          { issueId: issue.id },
+        );
+      }
+      if (issue.assignedToId) {
+        await notify(
+          issue.assignedToId,
+          '🚨 SLA Breached — Your Issue',
+          `"${issue.title}" assigned to you has exceeded its SLA deadline. Current status: ${issue.status}. Please take action immediately.`,
+          { issueId: issue.id },
+        );
+      }
       await notify(
         issue.createdById,
         '⏰ Your Issue Is Overdue',
@@ -101,48 +128,48 @@ export async function runEscalationCheck(): Promise<{ escalated: number }> {
     logger.info(`[Escalation] ${slaBreached.length} SLA-breached issue(s) escalated.`);
   }
 
-  // ── 3. WORK_DONE — inspector hasn't submitted AFTER photo ────────────────
-  const workDoneCutoff = new Date(now.getTime() - WORK_DONE_ESCALATION_HOURS * 3_600_000);
+  // ── 3. INSPECTING_WORK > 48h → notify concerned officer + inspector ──────
+  const inspectCutoff = new Date(now.getTime() - INSPECTING_WORK_ESCALATION_HOURS * 3_600_000);
 
-  const staleWorkDone = await prisma.issue.findMany({
+  const staleInspecting = await prisma.issue.findMany({
     where: {
       status:      IssueStatus.INSPECTING_WORK,
-      updatedAt:   { lt: workDoneCutoff },
+      updatedAt:   { lt: inspectCutoff },
       escalatedAt: null,
     },
     include: { ward: { select: { name: true } } },
   });
 
-  if (staleWorkDone.length) {
-    for (const issue of staleWorkDone) {
-      // Nudge the inspector
+  if (staleInspecting.length) {
+    for (const issue of staleInspecting) {
       if (issue.inspectorId) {
         await notify(
           issue.inspectorId,
           '⚠️ AFTER Photo Required',
-          `Work on "${issue.title}" was marked done ${WORK_DONE_ESCALATION_HOURS}h ago. Please submit your AFTER photo to complete the inspection.`,
+          `Work on "${issue.title}" was marked done ${INSPECTING_WORK_ESCALATION_HOURS}h ago. Please submit your AFTER photo to complete the inspection.`,
           { issueId: issue.id },
         );
       }
-      // Alert all staff in the same ward
-      await notifyWardStaff(
-        issue.wardId,
-        '⚠️ Inspection Stalled',
-        `"${issue.title}" in ${issue.ward.name} has been WORK_DONE for over ${WORK_DONE_ESCALATION_HOURS}h. Inspector has not yet submitted an AFTER photo.`,
-        { issueId: issue.id },
-      );
+      if (issue.assignedToId) {
+        await notify(
+          issue.assignedToId,
+          '⚠️ Inspection Stalled',
+          `"${issue.title}" in ${issue.ward.name} has been in INSPECTING_WORK for over ${INSPECTING_WORK_ESCALATION_HOURS}h. Inspector has not yet submitted an AFTER photo.`,
+          { issueId: issue.id },
+        );
+      }
       await prisma.issue.update({ where: { id: issue.id }, data: { escalatedAt: now } });
       await prisma.auditLog.create({
         data: {
           issueId:  issue.id,
           actorId:  null,
           action:   'ISSUE_ESCALATED',
-          metadata: { reason: 'WORK_DONE_NO_AFTER_PHOTO', hoursWaiting: WORK_DONE_ESCALATION_HOURS },
+          metadata: { reason: 'INSPECTING_WORK_NO_AFTER_PHOTO', hoursWaiting: INSPECTING_WORK_ESCALATION_HOURS },
         },
       });
     }
-    total += staleWorkDone.length;
-    logger.info(`[Escalation] ${staleWorkDone.length} WORK_DONE-stalled issue(s) escalated.`);
+    total += staleInspecting.length;
+    logger.info(`[Escalation] ${staleInspecting.length} INSPECTING_WORK-stalled issue(s) escalated.`);
   }
 
   logger.info(`[Escalation] Check complete. Total escalated: ${total}`);

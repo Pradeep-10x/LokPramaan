@@ -158,3 +158,20 @@ export async function notifyWardStaff(
   });
   await Promise.all(staff.map((u) => notify(u.id, title, body, meta)));
 }
+
+/**
+ * Notify all CITIZEN users in a ward.
+ * Used when an issue/project is completed so all ward residents are informed.
+ */
+export async function notifyWardCitizens(
+  wardId: string,
+  title: string,
+  body: string,
+  meta?: { issueId?: string; projectId?: string },
+) {
+  const citizens = await prisma.user.findMany({
+    where: { adminUnitId: wardId, role: Role.CITIZEN },
+    select: { id: true },
+  });
+  await Promise.all(citizens.map((u) => notify(u.id, title, body, meta)));
+}
