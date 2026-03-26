@@ -36,14 +36,12 @@ const DEPARTMENT_KEYWORDS: Record<Department, string[]> = {
     'footpath', 'pavement', 'sidewalk', 'manhole', 'dumping', 'cleanliness',
     'sweeping', 'park', 'tree', 'encroachment', 'open drain', 'blocked drain',
     'garbage dump', 'solid waste', 'broken road', 'road repair', 'road damage',
-  ],
-  [Department.SANITATION]: [
     'toilet', 'latrine', 'open defecation', 'sewer', 'stench', 'smell',
     'bathroom', 'public toilet', 'hygiene', 'waste disposal', 'pit', 'compost',
     'foul smell', 'dirty water', 'sanitation', 'human waste', 'open sewer',
     'overflowing', 'sewage overflow',
   ],
-  [Department.HEALTH]: [
+  [Department.MEDICAL]: [
     'hospital', 'clinic', 'doctor', 'medicine', 'health', 'disease', 'epidemic',
     'mosquito', 'dengue', 'malaria', 'vector', 'vaccine', 'ambulance',
     'dead animal', 'rat', 'pest', 'fumigation', 'cockroach', 'infection',

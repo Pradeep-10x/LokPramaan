@@ -321,7 +321,7 @@ async function main() {
       title: 'Overflowing sewer manhole near Kavi Nagar Chowk causing health hazard',
       description:
         'The sewer manhole cover at Kavi Nagar Chowk has been overflowing for three days. Sewage is spilling onto the footpath. Foul smell and mosquito breeding is alarming residents and shopkeepers alike.',
-      department: Department.SANITATION,
+      department: Department.MUNICIPAL,
       latitude: 28.6558,
       longitude: 77.4371,
       wardId: wardIds['Kavi Nagar'],
@@ -417,7 +417,7 @@ async function main() {
       title: 'Illegal garbage dumping near Mohan Nagar Chowk bus stand',
       description:
         'An unsanctioned waste dump has formed behind the Mohan Nagar Chowk bus shelter. Construction debris, domestic waste, and organic refuse are mixed together. Stray dogs and pigs frequent the site. No GMC garbage truck has collected from this point in over a week.',
-      department: Department.SANITATION,
+      department: Department.MUNICIPAL,
       latitude: 28.6872,
       longitude: 77.4228,
       wardId: wardIds['Mohan Nagar'],
@@ -501,7 +501,7 @@ async function main() {
       title: 'Industrial effluent discharging into open municipal drain, GT Road Sahibabad',
       description:
         'Dark, foul-smelling liquid is being discharged from a factory compound near GT Road into the open municipal drain. The drain feeds into the local canal. Foam and discoloration are visible. Residents in nearby Rampur Colony have reported skin irritation.',
-      department: Department.SANITATION,
+      department: Department.MUNICIPAL,
       latitude: 28.6628,
       longitude: 77.3632,
       wardId: wardIds['Sahibabad'],
@@ -526,7 +526,7 @@ async function main() {
       title: 'Public toilet facility near Kaushambi Bus Terminus completely non-functional',
       description:
         'The GMC public toilet block at Kaushambi Bus Terminus has been out of service for two weeks. Doors are broken, water supply is cut off, and sanitation is deplorable. This is a high-footfall area used by hundreds of daily commuters. Health risk is significant.',
-      department: Department.HEALTH,
+      department: Department.MEDICAL,
       latitude: 28.6392,
       longitude: 77.3182,
       wardId: wardIds['Kaushambi'],

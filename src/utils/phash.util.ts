@@ -26,30 +26,41 @@ const DHASH_HEIGHT = 8;
 /**
  * Compute the dHash of an image buffer.
  * Returns a 16-character lowercase hex string (64-bit hash).
+ * Returns null if the image is corrupt or cannot be processed.
  */
-export async function dHash(imageBuffer: Buffer): Promise<string> {
-  const { data } = await sharp(imageBuffer)
-    .resize(DHASH_WIDTH, DHASH_HEIGHT, { fit: 'fill' })
-    .greyscale()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
+export async function dHash(imageBuffer: Buffer): Promise<string | null> {
+  try {
+    const { data } = await sharp(imageBuffer)
+      .resize(DHASH_WIDTH, DHASH_HEIGHT, { fit: 'fill' })
+      .greyscale()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
 
-  // Build 64-bit binary string: compare each pixel to its right neighbour
-  let bits = '';
-  for (let row = 0; row < DHASH_HEIGHT; row++) {
-    for (let col = 0; col < DHASH_HEIGHT; col++) {          // 8 comparisons per row
-      const idx = row * DHASH_WIDTH + col;
-      bits += data[idx] > data[idx + 1] ? '1' : '0';
+    // Validate buffer length: must be exactly 9×8 = 72 bytes (greyscale)
+    if (data.length !== DHASH_WIDTH * DHASH_HEIGHT) {
+      return null;
     }
-  }
 
-  // Convert 64-bit binary string → 16-char hex
-  // Process in 4-bit chunks to avoid JS integer overflow
-  let hex = '';
-  for (let i = 0; i < 64; i += 4) {
-    hex += parseInt(bits.slice(i, i + 4), 2).toString(16);
+    // Build 64-bit binary string: compare each pixel to its right neighbour
+    let bits = '';
+    for (let row = 0; row < DHASH_HEIGHT; row++) {
+      for (let col = 0; col < DHASH_HEIGHT; col++) {          // 8 comparisons per row
+        const idx = row * DHASH_WIDTH + col;
+        bits += data[idx] > data[idx + 1] ? '1' : '0';
+      }
+    }
+
+    // Convert 64-bit binary string → 16-char hex
+    // Process in 4-bit chunks to avoid JS integer overflow
+    let hex = '';
+    for (let i = 0; i < 64; i += 4) {
+      hex += parseInt(bits.slice(i, i + 4), 2).toString(16);
+    }
+    return hex; // e.g. "a3f2c1d4e5b67890"
+  } catch {
+    // Corrupt/unreadable image — return null instead of crashing the upload
+    return null;
   }
-  return hex; // e.g. "a3f2c1d4e5b67890"
 }
 
 /**

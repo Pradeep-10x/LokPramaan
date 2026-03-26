@@ -27,25 +27,25 @@ model AdminUnit {
 }
 
 model User {
-  id               String         @id @default(uuid())
+  id               String             @id @default(uuid())
   name             String
-  email            String?        @unique
+  email            String?            @unique
   passwordHash     String
-  role             Role           @default(CITIZEN)
-  isEmailVerified  Boolean        @default(false)
+  role             Role               @default(CITIZEN)
+  isEmailVerified  Boolean            @default(false)
   adminUnitId      String?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  auditActions     AuditLog[]     @relation("AuditActor")
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  auditActions     AuditLog[]         @relation("AuditActor")
   uploadedEvidence Evidence[]
-  acceptedIssues   Issue[]        @relation("IssueAcceptedBy")
-  rejectedIssues   Issue[]        @relation("IssueRejectedBy")
-  assignedIssues   Issue[]        @relation("IssueAssignee")
-  createdIssues    Issue[]        @relation("IssueCreator")
-  inspectedIssues  Issue[]        @relation("IssueInspector")
-  contractedIssues Issue[]        @relation("IssueContractor")
-  createdProjects  Project[]      @relation("ProjectCreator")
-  adminUnit        AdminUnit?     @relation(fields: [adminUnitId], references: [id])
+  acceptedIssues   Issue[]            @relation("IssueAcceptedBy")
+  rejectedIssues   Issue[]            @relation("IssueRejectedBy")
+  assignedIssues   Issue[]            @relation("IssueAssignee")
+  createdIssues    Issue[]            @relation("IssueCreator")
+  inspectedIssues  Issue[]            @relation("IssueInspector")
+  contractedIssues Issue[]            @relation("IssueContractor")
+  createdProjects  Project[]          @relation("ProjectCreator")
+  adminUnit        AdminUnit?         @relation(fields: [adminUnitId], references: [id])
   verifications    Verification[]
   notifications    UserNotification[]
 
@@ -54,61 +54,61 @@ model User {
 }
 
 model Project {
-  id          String        @id @default(uuid())
-  title       String
-  description String
-  status      ProjectStatus @default(PROPOSED)
-  adminUnitId String 
-  createdById String
-  budget      Decimal?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id                String             @id @default(uuid())
+  title             String
+  description       String
+  status            ProjectStatus      @default(PROPOSED)
+  adminUnitId       String
+  createdById       String
+  budget            Decimal?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
   auditLogs         AuditLog[]
   issues            Issue[]
   userNotifications UserNotification[]
-  adminUnit         AdminUnit     @relation(fields: [adminUnitId], references: [id])
-  createdBy         User          @relation("ProjectCreator", fields: [createdById], references: [id])
+  adminUnit         AdminUnit          @relation(fields: [adminUnitId], references: [id])
+  createdBy         User               @relation("ProjectCreator", fields: [createdById], references: [id])
 
   @@index([adminUnitId])
   @@index([status])
 }
 
 model Issue {
-  id               String            @id @default(uuid())
-  title            String
-  description      String?
-  status           IssueStatus       @default(OPEN)
-  wardId           String
-  department       Department
-  projectId        String?
-  createdById      String
-  assignedToId     String?
-  inspectorId      String?
-  contractorId     String?
-  acceptedById     String?
-  acceptedAt       DateTime?
-  rejectedById     String?
-  rejectedAt       DateTime?
-  rejectionReason  String?
-  slaDeadline      DateTime?
-  latitude         Float
-  longitude        Float
-  duplicateOfId    String?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  escalatedAt      DateTime?
-  auditLogs        AuditLog[]
-  evidence         Evidence[]
-  acceptedBy       User?             @relation("IssueAcceptedBy", fields: [acceptedById], references: [id])
-  rejectedBy       User?             @relation("IssueRejectedBy", fields: [rejectedById], references: [id])
-  assignedTo       User?             @relation("IssueAssignee", fields: [assignedToId], references: [id])
-  inspector        User?             @relation("IssueInspector", fields: [inspectorId], references: [id])
-  contractor       User?             @relation("IssueContractor", fields: [contractorId], references: [id])
-  createdBy        User              @relation("IssueCreator", fields: [createdById], references: [id])
-  duplicateOf      Issue?            @relation("IssueDuplicate", fields: [duplicateOfId], references: [id])
-  duplicates       Issue[]           @relation("IssueDuplicate")
-  project          Project?          @relation(fields: [projectId], references: [id])
-  ward             AdminUnit         @relation(fields: [wardId], references: [id])
+  id                String             @id @default(uuid())
+  title             String
+  description       String?
+  status            IssueStatus        @default(OPEN)
+  wardId            String
+  department        Department
+  projectId         String?
+  createdById       String
+  assignedToId      String?
+  inspectorId       String?
+  contractorId      String?
+  acceptedById      String?
+  acceptedAt        DateTime?
+  rejectedById      String?
+  rejectedAt        DateTime?
+  rejectionReason   String?
+  slaDeadline       DateTime?
+  latitude          Float
+  longitude         Float
+  duplicateOfId     String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  escalatedAt       DateTime?
+  auditLogs         AuditLog[]
+  evidence          Evidence[]
+  acceptedBy        User?              @relation("IssueAcceptedBy", fields: [acceptedById], references: [id])
+  rejectedBy        User?              @relation("IssueRejectedBy", fields: [rejectedById], references: [id])
+  assignedTo        User?              @relation("IssueAssignee", fields: [assignedToId], references: [id])
+  inspector         User?              @relation("IssueInspector", fields: [inspectorId], references: [id])
+  contractor        User?              @relation("IssueContractor", fields: [contractorId], references: [id])
+  createdBy         User               @relation("IssueCreator", fields: [createdById], references: [id])
+  duplicateOf       Issue?             @relation("IssueDuplicate", fields: [duplicateOfId], references: [id])
+  duplicates        Issue[]            @relation("IssueDuplicate")
+  project           Project?           @relation(fields: [projectId], references: [id])
+  ward              AdminUnit          @relation(fields: [wardId], references: [id])
   notificationLogs  NotificationLog[]
   userNotifications UserNotification[]
   verification      Verification?
@@ -127,7 +127,7 @@ model Evidence {
   type         EvidenceType
   fileUrl      String
   fileHash     String
-  pHash        String?      // perceptual hash (dHash) for fraud detection
+  pHash        String? // perceptual hash (dHash) for fraud detection
   fraudFlag    Boolean      @default(false)
   fraudReason  String?
   latitude     Float?
@@ -210,8 +210,7 @@ enum Department {
   MUNICIPAL
   ELECTRICITY
   WATER
-  SANITATION
-  HEALTH
+  MEDICAL
   TRANSPORT
 }
 
@@ -233,19 +232,19 @@ enum IssueStatus {
   ACCEPTED
   REJECTED
   ASSIGNED
-  INSPECTING          // inspector assigned, awaiting before photo
-  CONTRACTOR_ASSIGNED 
-  INSPECTING_WORK     // contractor marked work complete
-  UNDER_REVIEW        // inspector submitted after photo, awaiting officer verification
+  INSPECTING // inspector assigned, awaiting before photo
+  CONTRACTOR_ASSIGNED
+  INSPECTING_WORK // contractor marked work complete
+  UNDER_REVIEW // inspector submitted after photo, awaiting officer verification
   IN_PROGRESS
   COMPLETED
   VERIFIED
 }
 
 enum EvidenceType {
-  CITIZEN  // photo submitted by citizen when filing the issue
-  BEFORE   // BEFORE photo uploaded by inspector (pre-repair)
-  AFTER    // AFTER  photo uploaded by inspector (post-repair)
+  CITIZEN // photo submitted by citizen when filing the issue
+  BEFORE // BEFORE photo uploaded by inspector (pre-repair)
+  AFTER // AFTER  photo uploaded by inspector (post-repair)
   CONTRACTOR // photo submitted by contractor when work is marked done
 }
 
