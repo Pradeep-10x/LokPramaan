@@ -48,6 +48,8 @@ model User {
   adminUnit        AdminUnit?         @relation(fields: [adminUnitId], references: [id])
   verifications    Verification[]
   notifications    UserNotification[]
+  comments         Comment[]          @relation("CommentAuthor")
+  mentions         CommentMention[]   @relation("MentionedUser")
 
   @@index([role])
   @@index([adminUnitId])
@@ -112,6 +114,7 @@ model Issue {
   notificationLogs  NotificationLog[]
   userNotifications UserNotification[]
   verification      Verification?
+  comments          Comment[]
 
   @@index([wardId])
   @@index([status])
@@ -196,6 +199,32 @@ model NotificationLog {
   issue         Issue               @relation(fields: [issueId], references: [id])
 
   @@index([issueId])
+}
+
+model Comment {
+  id        String           @id @default(uuid())
+  issueId   String
+  authorId  String
+  body      String
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  issue     Issue            @relation(fields: [issueId], references: [id])
+  author    User             @relation("CommentAuthor", fields: [authorId], references: [id])
+  mentions  CommentMention[]
+
+  @@index([issueId])
+  @@index([authorId])
+}
+
+model CommentMention {
+  id        String  @id @default(uuid())
+  commentId String
+  userId    String
+  comment   Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      User    @relation("MentionedUser", fields: [userId], references: [id])
+
+  @@unique([commentId, userId])
+  @@index([userId])
 }
 
 enum Role {
