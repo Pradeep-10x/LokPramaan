@@ -11,7 +11,7 @@ export async function createUser(req: Request, res: Response, next: NextFunction
   try {
     const result = await userService.createUser({
       ...req.body,
-      adminUnitId: req.user!.adminUnitId,
+      adminUnitId: req.user!.adminUnitId || req.user!.adminUnitId,
     }, req.user!.id);
     res.status(201).json(result);
   } catch (err) {
