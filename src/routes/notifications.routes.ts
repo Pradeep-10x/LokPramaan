@@ -131,4 +131,32 @@ router.post('/push-token',    authMiddleware, notificationsCtrl.registerPushToke
  */
 router.delete('/push-token',  authMiddleware, notificationsCtrl.removePushToken);
 
+/**
+ * @openapi
+ * /api/notify/test-push:
+ *   post:
+ *     summary: Send a test notification to a specific token (Debug only)
+ *     tags: [Notifications]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token, title, body]
+ *             properties:
+ *               token:
+ *                 type: string
+ *               title:
+ *                 type: string
+ *               body:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Test push sent
+ */
+router.post('/test-push',     authMiddleware, requireRole('ADMIN', 'OFFICER'), notificationsCtrl.testPush);
+
 export default router;

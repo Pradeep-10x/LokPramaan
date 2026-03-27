@@ -112,3 +112,26 @@ export async function removePushToken(req: Request, res: Response, next: NextFun
   }
 }
 
+/**
+ * POST /api/notify/test-push
+ * Send a notification to a specific token (no user required).
+ * Protected to ADMIN only for safety.
+ */
+export async function testPush(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { token, title, body } = req.body;
+    if (!token || !title || !body) {
+      res.status(400).json({ error: 'MISSING_FIELDS', message: 'token, title, and body are required' });
+      return;
+    }
+
+    const success = await pushService.sendToToken(token, title, body);
+    if (success) {
+      res.json({ ok: true, message: 'Test push sent' });
+    } else {
+      res.status(500).json({ error: 'PUSH_FAILED', message: 'FCM delivery failed or is not configured' });
+    }
+  } catch (err) {
+    next(err);
+  }
+}

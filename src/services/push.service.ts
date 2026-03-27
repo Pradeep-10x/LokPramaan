@@ -148,3 +148,49 @@ export async function removeToken(userId: string, token: string) {
     where: { userId, token },
   });
 }
+/**
+ * Send a push notification to a specific FCM registration token.
+ * Useful for debugging or one-off alerts.
+ */
+export async function sendToToken(
+  token: string,
+  title: string,
+  body: string,
+  data?: Record<string, string | undefined>,
+): Promise<boolean> {
+  if (!firebaseInitialised) return false;
+
+  const safeData = data
+    ? Object.fromEntries(
+        Object.entries(data)
+          .filter(([, v]) => v !== undefined)
+          .map(([k, v]) => [k, String(v)])
+      )
+    : undefined;
+
+  const message: admin.messaging.Message = {
+    token,
+    notification: { title, body },
+    data: safeData,
+    webpush: {
+      notification: {
+        title,
+        body,
+        icon: '/icon-192.png',
+        badge: '/badge-72.png',
+      },
+      fcmOptions: {
+        link: data?.link || '/',
+      },
+    },
+  };
+
+  try {
+    const response = await admin.messaging().send(message);
+    logger.debug('[push] Manually sent to token', { token, response });
+    return true;
+  } catch (err: any) {
+    logger.error('[push] Failed manual send to token', { token, error: err.code || err.message });
+    return false;
+  }
+}
