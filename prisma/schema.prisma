@@ -33,6 +33,7 @@ model User {
   passwordHash     String
   role             Role               @default(CITIZEN)
   isEmailVerified  Boolean            @default(false)
+  profilePicUrl    String?
   adminUnitId      String?
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt

@@ -2,10 +2,14 @@
  * JanPramaan — Users controller
  */
 import { Request, Response, NextFunction } from 'express';
+import multer from 'multer';
 import * as userService from '../services/user.service';
 import { getNearestWard } from '../services/adminUnit.service.js';
 import { prisma } from '../prisma/client.js';
 import { AppError } from '../middleware/error.middleware.js';
+import { storeFile } from '../utils/storage.util.js';
+
+export const profileUpload = multer({ storage: multer.memoryStorage() });
 
 export async function createUser(req: Request, res: Response, next: NextFunction) {
   try {
@@ -137,6 +141,66 @@ export async function updateMyWard(req: Request, res: Response, next: NextFuncti
     });
 
     res.json({ user, wardId: resolvedWardId });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function deleteUser(req: Request, res: Response, next: NextFunction) {
+  try {
+    const targetId = req.params.id as string;
+    const result = await userService.deleteUser(targetId, req.user!.id, req.user!.adminUnitId ?? null);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function changePassword(req: Request, res: Response, next: NextFunction) {
+  try {
+    const targetId = req.params.id as string;
+    const { newPassword } = req.body;
+    const result = await userService.changePassword(targetId, req.user!.id, req.user!.adminUnitId ?? null, newPassword);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function uploadProfilePic(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: 'NO_FILE', message: 'No photo uploaded' });
+      return;
+    }
+
+    const fileUrl = await storeFile(req.file.buffer, req.file.originalname, 'profile-pics');
+
+    const user = await prisma.user.update({
+      where: { id: req.user!.id },
+      data: { profilePicUrl: fileUrl },
+      select: { id: true, name: true, email: true, role: true, profilePicUrl: true },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: req.user!.id,
+        action: 'PROFILE_PIC_UPDATED',
+        metadata: { fileUrl },
+      },
+    });
+
+    res.json(user);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function changeMyPassword(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const result = await userService.changeMyPassword(req.user!.id, currentPassword, newPassword);
+    res.json(result);
   } catch (err) {
     next(err);
   }

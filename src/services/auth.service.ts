@@ -8,7 +8,7 @@ import { prisma } from '../prisma/client';
 import { config } from '../config';
 import { AppError } from '../middleware/error.middleware';
 import { Role } from '../generated/prisma/client.js';
-import { isEmailVerified, cleanupUsedOtp } from "./otp.js";
+import { isEmailVerified, cleanupUsedOtp, sendOtp, verifyOtp } from "./otp.js";
 import { getNearestWard } from "./adminUnit.service.js";
 const SALT_ROUNDS = 12;
 
@@ -73,21 +73,25 @@ export async function registerUser(input: RegisterInput) {
       passwordHash,
       role: Role.CITIZEN,
       adminUnitId: resolvedWardId ?? null,
-      isEmailVerified: true,
+      isEmailVerified: false,
     },
     select: { id: true, name: true, email: true, role: true, adminUnitId: true, createdAt: true },
   });
+
+  if (input.email) {
+    await sendOtp(input.email);
+  }
 
   // Audit log — user is the actor for their own registration
   await prisma.auditLog.create({
     data: {
       actorId: user.id,
-      action: 'USER_REGISTERED',
+      action: 'USER_REGISTERED_UNVERIFIED',
       metadata: { email: user.email, wardId: resolvedWardId ?? null },
     },
   });
 
-  return { user };
+  return { message: "OTP sent to email. Please verify to complete registration.", tempUserId: user.id };
 }
 
 /**
@@ -132,9 +136,12 @@ export async function loginUser(input: LoginInput) {
 }
 
 /**
- * Marks user as verified and logs them in.
+ * Verifies OTP, marks user as verified, and logs them in.
  */
-export async function verifyAndLoginUser(email: string) {
+export async function verifyAndLoginUser(email: string, otp: string) {
+  const isValid = await verifyOtp(email, otp);
+  if (!isValid) throw new AppError(400, 'INVALID_OTP', 'Invalid or expired OTP');
+
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) throw new AppError(404, 'NOT_FOUND', 'User not found');
   
@@ -142,6 +149,8 @@ export async function verifyAndLoginUser(email: string) {
     where: { id: user.id },
     data: { isEmailVerified: true }
   });
+
+  await cleanupUsedOtp(email);
 
   const token = jwt.sign({ userId: user.id, role: user.role }, config.jwtSecret, { expiresIn: '24h' });
 
@@ -164,4 +173,45 @@ export async function verifyAndLoginUser(email: string) {
       adminUnitId: user.adminUnitId,
     },
   };
+}
+
+export async function sendForgotPasswordOtp(email: string) {
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    // Return standard success to prevent email enumeration
+    return { message: "If this email is registered, an OTP has been sent." };
+  }
+  await sendOtp(email);
+  return { message: "If this email is registered, an OTP has been sent." };
+}
+
+export async function resetPassword(email: string, otp: string, newPassword: string) {
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    throw new AppError(404, 'NOT_FOUND', 'Invalid request');
+  }
+
+  const isValid = await verifyOtp(email, otp);
+  if (!isValid) {
+    throw new AppError(400, 'INVALID_OTP', 'Invalid or expired OTP');
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+  
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash }
+  });
+
+  await cleanupUsedOtp(email);
+
+  await prisma.auditLog.create({
+    data: {
+      actorId: user.id,
+      action: 'PASSWORD_RESET',
+      metadata: { email }
+    }
+  });
+
+  return { message: "Password reset successfully" };
 }

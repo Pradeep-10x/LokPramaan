@@ -8,5 +8,4 @@ src/generated/
 scripts/
 .gitignore
 README.md
-.venv/firebase-service-account.json
-firebase-service-account.json
+.venv/firebase-service-account.json*firebase-service-account.json
