@@ -4,6 +4,7 @@
  */
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import disposableDomains from 'disposable-email-domains';
 import { prisma } from '../prisma/client';
 import { config } from '../config';
 import { AppError } from '../middleware/error.middleware';
@@ -11,6 +12,9 @@ import { Role } from '../generated/prisma/client.js';
 import { isEmailVerified, cleanupUsedOtp, sendOtp, verifyOtp } from "./otp.js";
 import { getNearestWard } from "./adminUnit.service.js";
 const SALT_ROUNDS = 12;
+
+// Create a Set for O(1) lookup
+const DISPOSABLE_SET = new Set(disposableDomains);
 
 export interface RegisterInput {
   name: string;
@@ -32,6 +36,12 @@ export interface LoginInput {
 export async function registerUser(input: RegisterInput) {
   if (!input.email) {
     throw Object.assign(new Error('Email is required for registration'), { statusCode: 400 });
+  }
+
+  // Check for disposable/temp email domains
+  const domain = input.email.split('@')[1]?.toLowerCase();
+  if (domain && DISPOSABLE_SET.has(domain)) {
+    throw new AppError(400, 'DISPOSABLE_EMAIL', 'Registration with temporary or disposable email addresses is not allowed');
   }
 
   // Resolve adminUnitId: manual wardId > device GPS auto-detect > null

@@ -9,3 +9,4 @@ scripts/
 .gitignore
 README.md
 .venv/firebase-service-account.json*firebase-service-account.json
+firebase-service-account.json
