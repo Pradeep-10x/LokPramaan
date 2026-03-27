@@ -93,6 +93,7 @@ model Issue {
   rejectedAt        DateTime?
   rejectionReason   String?
   slaDeadline       DateTime?
+  priority          IssuePriority?
   latitude          Float
   longitude         Float
   duplicateOfId     String?
@@ -122,6 +123,7 @@ model Issue {
   @@index([inspectorId])
   @@index([contractorId])
   @@index([projectId])
+  @@index([priority])
 }
 
 model Evidence {
@@ -268,6 +270,12 @@ enum IssueStatus {
   IN_PROGRESS
   COMPLETED
   VERIFIED
+}
+
+enum IssuePriority {
+  HIGH
+  MEDIUM
+  LOW
 }
 
 enum EvidenceType {

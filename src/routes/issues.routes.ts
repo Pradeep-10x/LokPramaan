@@ -367,4 +367,34 @@ router.post('/:id/evidence', authMiddleware, upload.single('photo'), issuesCtrl.
  */
 router.get('/:id/timeline', issuesCtrl.getTimeline);
 
+/**
+ * @openapi
+ * /api/issues/{id}/priority:
+ *   patch:
+ *     summary: Set or update issue priority (Officer/Admin)
+ *     tags: [Issues]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [priority]
+ *             properties:
+ *               priority:
+ *                 type: string
+ *                 enum: [HIGH, MEDIUM, LOW]
+ *     responses:
+ *       200:
+ *         description: Priority updated. **Required Roles:** OFFICER, ADMIN
+ */
+router.patch('/:id/priority', authMiddleware, requireRole('OFFICER', 'ADMIN'), issuesCtrl.setPriority);
+
 export default router;

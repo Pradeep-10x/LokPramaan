@@ -6,7 +6,7 @@ import multer from 'multer';
 import * as issueService from '../services/issue.service';
 import { classifyDepartment } from '../services/classification.service';
 import * as evidenceService from '../services/evidence.service';
-import { EvidenceType, IssueStatus } from '../generated/prisma/client.js';
+import { EvidenceType, IssuePriority, IssueStatus } from '../generated/prisma/client.js';
 import { prisma } from '../prisma/client';
 import { tryExtractPhotoLocation } from '../services/exif.service';
 import { getNearestWard } from '../services/adminUnit.service';
@@ -169,9 +169,15 @@ export async function list(req: Request, res: Response, next: NextFunction) {
     // so it matches officer, inspector, or contractor.
     const assignedId = req.query.assignedTo as string | undefined;
 
+    const rawPriority = req.query.priority as string | undefined;
+    const priority = rawPriority && (Object.values(IssuePriority) as string[]).includes(rawPriority)
+      ? (rawPriority as IssuePriority)
+      : undefined;
+
     const result = await issueService.listIssues({
       wardId:       req.query.wardId       as string | undefined,
       status,
+      priority,
       assignedToId: assignedId,
       inspectorId:  assignedId,
       contractorId: assignedId,
@@ -255,7 +261,7 @@ export async function assign(req: Request, res: Response, next: NextFunction) {
 export async function accept(req: Request, res: Response, next: NextFunction) {
   try {
     const id = req.params.id as string;
-    const result = await issueService.acceptIssue(id, req.user!.id, req.user!.adminUnitId);
+    const result = await issueService.acceptIssue(id, req.user!.id, req.user!.adminUnitId, req.body.priority);
     res.json(result);
   } catch (err) {
     next(err);
@@ -372,6 +378,28 @@ export async function classify(req: Request, res: Response, next: NextFunction) 
       return;
     }
     const result = classifyDepartment(title, description);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+const VALID_PRIORITIES = new Set(Object.values(IssuePriority));
+
+export async function setPriority(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = req.params.id as string;
+    const { priority } = req.body;
+
+    if (!priority || !VALID_PRIORITIES.has(priority)) {
+      res.status(400).json({
+        error: 'INVALID_PRIORITY',
+        message: `priority must be one of: ${[...VALID_PRIORITIES].join(', ')}`,
+      });
+      return;
+    }
+
+    const result = await issueService.setPriority(id, req.user!.id, priority as IssuePriority);
     res.json(result);
   } catch (err) {
     next(err);

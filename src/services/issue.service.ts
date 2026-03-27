@@ -5,7 +5,7 @@
  */
 import { prisma } from '../prisma/client';
 import { AppError } from '../middleware/error.middleware';
-import { IssueStatus, ProjectStatus, Role, EvidenceType } from '../generated/prisma/client.js';
+import { IssueStatus, IssuePriority, ProjectStatus, Role, EvidenceType } from '../generated/prisma/client.js';
 import { config } from '../config';
 import { notify, notifyWardOfficers } from './notification.service.js';
 import { haversineDistance } from '../utils/geo.util.js';
@@ -185,6 +185,7 @@ export async function acceptIssue(
   issueId: string,
   actorId: string,
   actorAdminUnitId: string | null,
+  priority?: IssuePriority,
 ) {
   const issue = await prisma.issue.findUnique({ where: { id: issueId } });
   if (!issue) {
@@ -215,6 +216,7 @@ export async function acceptIssue(
         status: IssueStatus.ACCEPTED,
         acceptedById: actorId,
         acceptedAt: now,
+        ...(priority ? { priority } : {}),
       },
       include: {
         ward: { select: { id: true, name: true } },
@@ -230,6 +232,7 @@ export async function acceptIssue(
         action: 'ISSUE_ACCEPTED',
         metadata: {
           previousStatus: issue.status,
+          ...(priority ? { priority } : {}),
         },
       },
     }),
@@ -378,6 +381,7 @@ export async function rejectIssue(
 export async function listIssues(filters: {
   wardId?: string;
   status?: IssueStatus;
+  priority?: IssuePriority;
   assignedToId?: string;
   inspectorId?: string;
   contractorId?: string;
@@ -399,6 +403,7 @@ export async function listIssues(filters: {
     where: {
       ...(filters.wardId      && { wardId:       filters.wardId }),
       ...(filters.status      && { status:       filters.status }),
+      ...(filters.priority    && { priority:     filters.priority }),
       ...(filters.projectId   && { projectId:    filters.projectId }),
       ...(filters.createdById && { createdById:  filters.createdById }),
       ...(assignmentOrClause && assignmentOrClause.length > 0 && { OR: assignmentOrClause })
@@ -832,6 +837,53 @@ export async function markWorkDone(issueId: string, actorId: string) {
     `The contractor has finished work on your issue "${issue.title}". A final inspection is now in progress.`,
     { issueId },
   );
+
+  return updated;
+}
+
+/**
+ * Set or update priority on an issue (OFFICER/ADMIN action).
+ * Can be called in any status — priority is an orthogonal concern.
+ */
+export async function setPriority(
+  issueId: string,
+  actorId: string,
+  priority: IssuePriority,
+) {
+  const issue = await prisma.issue.findUnique({ where: { id: issueId } });
+  if (!issue) throw new AppError(404, 'NOT_FOUND', 'Issue not found');
+
+  // Authorisation: must be the assigned officer OR a ward ADMIN
+  const actor = await prisma.user.findUnique({ where: { id: actorId } });
+  if (!actor) throw new AppError(403, 'FORBIDDEN', 'Actor not found');
+
+  const isAssignedOfficer = issue.assignedToId === actorId && actor.role === Role.OFFICER;
+  const isWardAdmin = actor.role === Role.ADMIN && actor.adminUnitId === issue.wardId;
+
+  if (!isAssignedOfficer && !isWardAdmin) {
+    throw new AppError(403, 'FORBIDDEN', 'Only the assigned officer or a ward ADMIN can set priority');
+  }
+
+  const previousPriority = issue.priority;
+
+  const [updated] = await prisma.$transaction([
+    prisma.issue.update({
+      where: { id: issueId },
+      data: { priority },
+      include: {
+        ward: { select: { id: true, name: true } },
+        assignedTo: { select: { id: true, name: true } },
+      },
+    }),
+    prisma.auditLog.create({
+      data: {
+        issueId,
+        actorId,
+        action: 'PRIORITY_SET',
+        metadata: { previousPriority, newPriority: priority },
+      },
+    }),
+  ]);
 
   return updated;
 }
