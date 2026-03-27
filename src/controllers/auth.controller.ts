@@ -3,6 +3,7 @@
  */
 import { Request, Response, NextFunction } from 'express';
 import * as authService from '../services/auth.service';
+// import { t } from '../i18n';
 
 export async function register(req: Request, res: Response, next: NextFunction) {
   try {
