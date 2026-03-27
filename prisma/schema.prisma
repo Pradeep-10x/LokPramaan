@@ -96,12 +96,14 @@ model Issue {
   rejectionReason   String?
   slaDeadline       DateTime?
   priority          IssuePriority?
-  latitude          Float
-  longitude         Float
-  duplicateOfId     String?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  escalatedAt       DateTime?
+  latitude              Float
+  longitude             Float
+  duplicateOfId         String?
+  merkleRoot            String?
+  merkleRootComputedAt  DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  escalatedAt           DateTime?
   auditLogs         AuditLog[]
   evidence          Evidence[]
   acceptedBy        User?              @relation("IssueAcceptedBy", fields: [acceptedById], references: [id])
@@ -143,6 +145,8 @@ model Evidence {
   geoFallback  Boolean      @default(false)
   uploadedById String
   uploadedAt   DateTime     @default(now())
+  deletedAt    DateTime?
+  deletedById  String?
   issue        Issue        @relation(fields: [issueId], references: [id])
   uploadedBy   User         @relation(fields: [uploadedById], references: [id])
 

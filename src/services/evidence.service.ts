@@ -14,6 +14,7 @@ import { IssueStatus } from '../generated/prisma/client.js';
 import { storeFile } from '../utils/storage.util';
 import { notify, notifyWardOfficers } from './notification.service.js';
 import { checkPhotoFraud, persistFraudFlag } from './fraud.service.js';
+import { persistIssueMerkleRoot } from './merkle.service.js';
 
 
 /**
@@ -236,6 +237,9 @@ export async function uploadEvidence(
     );
   }
 
+  // ── Recompute and persist Merkle root ───────────────────────────────────
+  await persistIssueMerkleRoot(issueId);
+
   return { evidence, geoWarning };
 }
 
@@ -249,15 +253,16 @@ export async function listEvidence(issueId: string) {
   }
 
   return prisma.evidence.findMany({
-    where: { issueId },
+    where: { issueId, deletedAt: null },
     include: { uploadedBy: { select: { id: true, name: true } } },
     orderBy: { uploadedAt: 'asc' },
   });
 }
 
 /**
- * Reject a piece of evidence. This deletes the evidence record and
- * notifies the inspector to upload again.
+ * Reject a piece of evidence. Soft-deletes the evidence record (preserving
+ * its hash in the Merkle tree for audit trail integrity) and notifies
+ * the inspector to upload again.
  */
 export async function rejectEvidence(
   issueId: string,
@@ -279,6 +284,10 @@ export async function rejectEvidence(
     throw new AppError(400, 'MISMATCH', 'Evidence does not belong to this issue');
   }
 
+  if (evidence.deletedAt) {
+    throw new AppError(400, 'ALREADY_DELETED', 'Evidence has already been rejected');
+  }
+
   let newStatus = issue.status;
   if (evidence.type === EvidenceType.CONTRACTOR) {
     newStatus = IssueStatus.IN_PROGRESS;
@@ -286,14 +295,20 @@ export async function rejectEvidence(
     newStatus = IssueStatus.INSPECTING_WORK;
   }
 
-  // Delete the evidence and downgrade status
+  const now = new Date();
+
+  // Soft-delete the evidence and downgrade status
   await prisma.$transaction(async (tx) => {
-    await tx.evidence.delete({ where: { id: evidenceId } });
+    await tx.evidence.update({
+      where: { id: evidenceId },
+      data: { deletedAt: now, deletedById: actorId },
+    });
     
-    // If the contractor's work is rejected, any existing AFTER verification photo is invalidated.
+    // If the contractor's work is rejected, soft-delete any existing AFTER verification photo too.
     if (evidence.type === EvidenceType.CONTRACTOR) {
-      await tx.evidence.deleteMany({
-        where: { issueId, type: EvidenceType.AFTER }
+      await tx.evidence.updateMany({
+        where: { issueId, type: EvidenceType.AFTER, deletedAt: null },
+        data: { deletedAt: now, deletedById: actorId },
       });
     }
 
@@ -314,6 +329,9 @@ export async function rejectEvidence(
     });
   });
 
+  // Recompute Merkle root (soft-deleted hashes are still included)
+  await persistIssueMerkleRoot(issueId);
+
   // Notify the person who uploaded it
   await notify(
     evidence.uploadedById,
@@ -322,5 +340,5 @@ export async function rejectEvidence(
     { issueId }
   );
 
-  return { success: true, message: 'Evidence rejected and deleted. Uploader notified and status updated if applicable.' };
+  return { success: true, message: 'Evidence rejected (soft-deleted). Uploader notified and status updated if applicable.' };
 }

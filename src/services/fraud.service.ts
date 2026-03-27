@@ -90,7 +90,7 @@ export async function checkPhotoFraud(
     const batch = await prisma.evidence.findMany({
       take:   BATCH,
       ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
-      where:  { issueId: { not: issueId }, pHash: { not: null } },
+      where:  { issueId: { not: issueId }, pHash: { not: null }, deletedAt: null },
       select: { id: true, pHash: true },
       orderBy: { id: 'asc' },
     });
